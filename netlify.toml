@@ -1,0 +1,14 @@
+# Deploy del frontend (Vite multi-página) en Netlify.
+# Las variables VITE_* se cargan en: Site configuration > Environment variables.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# /admin -> /admin.html
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200

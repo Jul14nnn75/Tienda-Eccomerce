@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pago no completado | Mi Tienda</title>
+  <script>
+    // Aplica el tema guardado antes de pintar (evita el flash)
+    (function () {
+      const stored = localStorage.getItem('tienda_theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored ? stored === 'dark' : prefersDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/input.css" />
+</head>
+<body class="min-h-screen flex items-center justify-center px-4">
+  <div class="surface border rounded-lg shadow-sm p-8 max-w-md w-full text-center">
+    <div class="text-5xl mb-4">❌</div>
+    <h1 class="text-xl font-extrabold mb-2">No pudimos procesar tu pago</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+      El pago fue rechazado o cancelado. Tu carrito sigue guardado, podés volver a intentarlo.
+    </p>
+    <a href="/" class="btn-primary inline-block">Volver a la tienda</a>
+  </div>
+  <script type="module" src="/js/pago.js"></script>
+</body>
+</html>

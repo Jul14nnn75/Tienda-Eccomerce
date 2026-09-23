@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+.vite/
+
+# Variables de entorno y credenciales (NUNCA subir)
+.env
+.env.local
+.env.*.local
+scripts/service-account.json
+*-firebase-adminsdk-*.json
+
+# Firebase
+.firebase/
+*-debug.log
+
+# Netlify
+.netlify/
+
+# Editor / SO
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log

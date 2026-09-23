@@ -1,0 +1,11 @@
+{
+  "name": "scripts",
+  "private": true,
+  "description": "Scripts administrativos locales (no se deployan)",
+  "scripts": {
+    "set-admin": "node set-admin-claim.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

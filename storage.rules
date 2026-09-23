@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Imágenes de productos: lectura pública, escritura solo para admins
+// (mismo custom claim que usan firestore.rules).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /products/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.admin == true
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Cualquier otra ruta: denegado.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

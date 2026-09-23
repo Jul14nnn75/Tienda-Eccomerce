@@ -1,0 +1,161 @@
+/* Fuente (cambiala acá y en --font-sans) */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   TEMA / WHITE-LABEL
+   Valores en RGB separados por espacios (formato que Tailwind necesita para
+   soportar opacidades tipo bg-primary/15). Cambiá solo este bloque para
+   re-brandear toda la tienda, el admin y las páginas de pago.
+   ========================================================================== */
+:root {
+  --color-primary: 22 163 74;        /* botones, links, acentos */
+  --color-primary-dark: 21 128 61;   /* hover y precios */
+  --color-primary-light: 220 252 231;/* fondos suaves (badges) */
+  --color-primary-bright: 52 211 153;/* acentos en modo oscuro */
+
+  --color-bg: 249 250 251;           /* fondo general */
+  --color-card: 255 255 255;         /* tarjetas */
+  --color-border: 229 231 235;       /* bordes */
+
+  --font-sans: 'Plus Jakarta Sans';
+}
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-gray-800 antialiased transition-colors duration-150
+           dark:bg-gray-900 dark:text-gray-100;
+  }
+}
+
+@layer components {
+  /* --- Superficies y formularios --- */
+  .surface {
+    @apply bg-brand-card border-brand-border dark:bg-gray-800 dark:border-gray-700;
+  }
+
+  .input-field {
+    @apply w-full border border-brand-border rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
+           dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:placeholder-gray-500;
+  }
+
+  .btn-primary {
+    @apply w-full bg-primary hover:bg-primary-dark text-white font-semibold
+           py-2.5 rounded-md transition-all duration-150 active:scale-95;
+  }
+
+  /* --- Catálogo --- */
+  .product-card {
+    @apply bg-brand-card border border-brand-border rounded-lg overflow-hidden flex flex-col justify-between
+           transition-shadow duration-150 hover:shadow-md
+           dark:bg-gray-800 dark:border-gray-700;
+  }
+
+  .badge-offer {
+    @apply inline-flex items-center gap-1 bg-primary-light text-primary-dark
+           text-xs font-bold px-2 py-0.5 rounded
+           dark:bg-primary dark:text-white;
+  }
+
+  .category-pill {
+    @apply inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full
+           bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300;
+  }
+
+  .category-tab {
+    @apply px-3.5 py-1.5 rounded-full font-medium text-gray-600 dark:text-gray-300
+           hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150;
+  }
+  .category-tab-active {
+    @apply bg-primary text-white hover:bg-primary dark:hover:bg-primary;
+  }
+
+  /* --- Stock (colores semánticos, independientes de la marca) --- */
+  .stock-badge {
+    @apply inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border;
+  }
+  .stock-badge-ok {
+    @apply stock-badge bg-emerald-50 text-emerald-700 border-emerald-200
+           dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20;
+  }
+  .stock-badge-low {
+    @apply stock-badge bg-amber-50 text-amber-700 border-amber-200
+           dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20;
+  }
+  .stock-badge-out {
+    @apply stock-badge bg-red-50 text-red-700 border-red-200
+           dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20;
+  }
+
+  /* --- Admin: botones de ícono --- */
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors duration-150;
+  }
+  .icon-btn-edit {
+    @apply icon-btn text-gray-500 hover:text-blue-600 hover:bg-blue-50
+           dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-500/10;
+  }
+  .icon-btn-delete {
+    @apply icon-btn text-gray-500 hover:text-red-600 hover:bg-red-50
+           dark:text-slate-400 dark:hover:text-red-400 dark:hover:bg-red-500/10;
+  }
+
+  /* --- Admin: métricas --- */
+  .metric-card {
+    @apply surface border rounded-lg p-4 flex flex-col gap-1 shadow-sm dark:border-slate-800;
+  }
+  .metric-card-value {
+    @apply text-2xl font-extrabold;
+  }
+  .metric-card-label {
+    @apply text-xs text-gray-500 dark:text-gray-400 font-medium;
+  }
+
+  /* --- Toasts --- */
+  .toast {
+    @apply flex items-center gap-2 surface border shadow-lg rounded-lg px-4 py-3 text-sm font-medium
+           min-w-[240px] animate-toast-in;
+  }
+  .toast-success {
+    @apply border-l-4 border-l-primary;
+  }
+  .toast-error {
+    @apply border-l-4 border-l-red-500;
+  }
+}
+
+@layer utilities {
+  .animate-toast-in {
+    animation: toast-in 0.2s ease-out;
+  }
+
+  /* Scroll horizontal sin scrollbar visible (nav de categorías) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Tabla del admin en mobile: cada <td> muestra su nombre de columna
+   (ej. "Marca: Acme") porque la tabla se apila como tarjetas. */
+@media (max-width: 767px) {
+  .admin-table td[data-label]::before {
+    content: attr(data-label) ': ';
+    font-weight: 600;
+    color: #9ca3af;
+    display: inline-block;
+    min-width: 90px;
+  }
+}
