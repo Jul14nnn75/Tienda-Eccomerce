@@ -1,5 +1,5 @@
 /* Fuente (cambiala acá y en --font-sans) */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,19 +9,24 @@
    TEMA / WHITE-LABEL
    Valores en RGB separados por espacios (formato que Tailwind necesita para
    soportar opacidades tipo bg-primary/15). Cambiá solo este bloque para
-   re-brandear toda la tienda, el admin y las páginas de pago.
+   re-brandear toda la tienda, el admin y las páginas de pago — o hacelo en
+   caliente desde el panel admin (pestaña "Estilos"), que pisa estas mismas
+   variables vía JS (ver js/brand-theme.js) sin tocar este archivo.
    ========================================================================== */
 :root {
-  --color-primary: 22 163 74;        /* botones, links, acentos */
-  --color-primary-dark: 21 128 61;   /* hover y precios */
-  --color-primary-light: 220 252 231;/* fondos suaves (badges) */
-  --color-primary-bright: 52 211 153;/* acentos en modo oscuro */
+  --color-primary: 31 41 55;          /* carbón — botones, links, acentos */
+  --color-primary-dark: 17 24 39;     /* hover y precios */
+  --color-primary-light: 243 232 218; /* fondos suaves (badges) */
+  --color-primary-bright: 227 166 109;/* acentos en modo oscuro */
 
-  --color-bg: 249 250 251;           /* fondo general */
-  --color-card: 255 255 255;         /* tarjetas */
-  --color-border: 229 231 235;       /* bordes */
+  --color-secondary: 181 121 60;      /* cobre — acento secundario (hero, "Nuevo") */
+  --color-secondary-dark: 150 96 45;  /* hover del acento secundario */
 
-  --font-sans: 'Plus Jakarta Sans';
+  --color-bg: 250 249 247;            /* fondo general */
+  --color-card: 255 255 255;          /* tarjetas */
+  --color-border: 229 226 220;        /* bordes */
+
+  --font-sans: 'Inter';
 }
 
 @layer base {
@@ -48,9 +53,20 @@
            py-2.5 rounded-md transition-all duration-150 active:scale-95;
   }
 
+  .btn-secondary {
+    @apply w-full bg-secondary hover:bg-secondary-dark text-white font-semibold
+           py-2.5 rounded-md transition-all duration-150 active:scale-95;
+  }
+
+  .btn-outline {
+    @apply w-full border border-brand-border text-gray-700 hover:border-primary hover:text-primary
+           font-semibold py-2.5 rounded-md transition-all duration-150 active:scale-95
+           dark:border-gray-600 dark:text-gray-200 dark:hover:border-primary-bright dark:hover:text-primary-bright;
+  }
+
   /* --- Catálogo --- */
   .product-card {
-    @apply bg-brand-card border border-brand-border rounded-lg overflow-hidden flex flex-col justify-between
+    @apply bg-brand-card border border-brand-border rounded-md overflow-hidden flex flex-col justify-between
            transition-shadow duration-150 hover:shadow-md
            dark:bg-gray-800 dark:border-gray-700;
   }
@@ -72,6 +88,36 @@
   }
   .category-tab-active {
     @apply bg-primary text-white hover:bg-primary dark:hover:bg-primary;
+  }
+
+  /* --- Admin: tabs de secciones (Productos / Pedidos) --- */
+  .admin-tab {
+    @apply px-4 py-2 -mb-px text-sm font-semibold text-gray-500 dark:text-gray-400
+           border-b-2 border-transparent hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-150;
+  }
+  .admin-tab-active {
+    @apply text-primary-dark dark:text-primary-bright border-primary;
+  }
+
+  /* --- Admin: estado de pago de un pedido (colores semánticos) --- */
+  .order-status-badge {
+    @apply inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border;
+  }
+  .order-status-approved {
+    @apply order-status-badge bg-emerald-50 text-emerald-700 border-emerald-200
+           dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20;
+  }
+  .order-status-pending {
+    @apply order-status-badge bg-amber-50 text-amber-700 border-amber-200
+           dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20;
+  }
+  .order-status-rejected {
+    @apply order-status-badge bg-red-50 text-red-700 border-red-200
+           dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20;
+  }
+  .order-status-neutral {
+    @apply order-status-badge bg-gray-100 text-gray-600 border-gray-200
+           dark:bg-slate-700/40 dark:text-slate-300 dark:border-slate-600;
   }
 
   /* --- Stock (colores semánticos, independientes de la marca) --- */
@@ -113,6 +159,34 @@
   }
   .metric-card-label {
     @apply text-xs text-gray-500 dark:text-gray-400 font-medium;
+  }
+
+  /* --- Home: tile de categoría (grilla de acceso rápido) --- */
+  .category-tile {
+    @apply flex items-center justify-center text-center px-3 py-6 rounded-md border border-brand-border
+           bg-brand-card font-semibold text-sm text-gray-700 hover:border-primary hover:text-primary
+           transition-colors duration-150
+           dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 dark:hover:border-primary-bright dark:hover:text-primary-bright;
+  }
+
+  /* --- Home: banner principal --- */
+  .home-hero {
+    @apply bg-primary text-white rounded-lg overflow-hidden;
+  }
+
+  /* --- Selector de variantes (talle/color) en la ficha de producto --- */
+  .variant-pill {
+    @apply px-3 py-1.5 rounded-md border text-sm font-medium border-brand-border
+           text-gray-700 hover:border-primary transition-colors duration-150
+           dark:border-gray-600 dark:text-gray-200;
+  }
+  .variant-pill-active {
+    @apply border-primary bg-primary-light text-primary-dark
+           dark:bg-primary/20 dark:text-primary-bright;
+  }
+  .variant-pill-disabled {
+    @apply opacity-40 cursor-not-allowed hover:border-brand-border line-through
+           dark:hover:border-gray-600;
   }
 
   /* --- Toasts --- */

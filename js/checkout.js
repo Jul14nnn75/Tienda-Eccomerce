@@ -8,14 +8,17 @@
 // momento en que se agregó, y puede haber quedado vieja (otro cliente
 // compró el último, o el admin lo bajó en el panel).
 
-import { getProductById } from './firebase.js';
+import { getProductById, getAuthToken } from './firebase.js';
 
 const CREATE_PREFERENCE_URL = import.meta.env.VITE_MP_CREATE_PREFERENCE_URL;
 
 /**
- * Revisa el stock real en Firestore para cada item del carrito.
- * @param {Array<{id:string, name:string, qty:number}>} items
- * @returns {Promise<Array<{id:string, name:string, reason:'discontinued'|'insufficient', available?:number}>>}
+ * Revisa el stock real en Firestore para cada item del carrito. Si el item
+ * tiene variantId, valida el stock de ESA variante puntual (no el stock
+ * "global" del producto, que con variantes deja de ser la fuente de verdad
+ * — ver functions/index.js#buildItems, misma validación server-side).
+ * @param {Array<{id:string, variantId?:string|null, name:string, qty:number}>} items
+ * @returns {Promise<Array<{id:string, variantId:?string, name:string, reason:'discontinued'|'insufficient', available?:number}>>}
  *   Lista de problemas encontrados. Vacía = todo el carrito tiene stock suficiente.
  */
 export async function validateCartStock(items) {
@@ -30,12 +33,28 @@ export async function validateCartStock(items) {
 
   for (const { item, product } of checks) {
     if (!product) {
-      problems.push({ id: item.id, name: item.name, reason: 'discontinued' });
+      problems.push({ id: item.id, variantId: item.variantId || null, name: item.name, reason: 'discontinued' });
       continue;
     }
+
+    const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+    if (hasVariants) {
+      const variant = item.variantId ? product.variants.find((v) => v.id === item.variantId) : null;
+      if (!variant) {
+        // La variante que tenía en el carrito ya no existe (el admin la borró).
+        problems.push({ id: item.id, variantId: item.variantId || null, name: item.name, reason: 'discontinued' });
+        continue;
+      }
+      const available = Number(variant.stock ?? 0);
+      if (item.qty > available) {
+        problems.push({ id: item.id, variantId: item.variantId, name: item.name, reason: 'insufficient', available });
+      }
+      continue;
+    }
+
     const available = Number(product.stock ?? 0);
     if (item.qty > available) {
-      problems.push({ id: item.id, name: item.name, reason: 'insufficient', available });
+      problems.push({ id: item.id, variantId: null, name: item.name, reason: 'insufficient', available });
     }
   }
 
@@ -43,23 +62,40 @@ export async function validateCartStock(items) {
 }
 
 /**
- * @param {Array<{id:string, qty:number}>} items  Solo se usan id y qty: el precio
- *   lo resuelve el servidor contra Firestore (el cliente no es confiable).
- * @param {string|null} orderId  Pedido creado en Firestore (external_reference).
+ * @param {Array<{id:string, qty:number, variantId?:string|null}>} items  Solo se
+ *   usan id, qty y variantId: el precio lo resuelve el servidor contra
+ *   Firestore (el cliente no es confiable) — ver functions/index.js#buildItems.
+ * @param {string} orderId  Pedido creado en Firestore (external_reference),
+ *   ya con su campo `shipping` (método + dirección si corresponde — ver
+ *   js/app.js). Obligatorio: sin un pedido para conciliar, el webhook de
+ *   Mercado Pago no tiene forma de marcar el pago ni descontar stock (ver
+ *   functions/index.js). El costo de envío no se manda acá: la Cloud
+ *   Function lo calcula sola a partir de `order.shipping.method`.
  * @returns {Promise<string>} init_point — la URL del Checkout Pro de Mercado Pago
  */
-export async function createMercadoPagoCheckout(items, orderId = null) {
+export async function createMercadoPagoCheckout(items, orderId) {
   if (!CREATE_PREFERENCE_URL) {
     throw new Error(
       'Falta configurar VITE_MP_CREATE_PREFERENCE_URL en el .env (la URL de tu Cloud Function).'
     );
   }
+  if (!orderId) {
+    throw new Error('No se pudo registrar el pedido. Probá de nuevo.');
+  }
+
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error('No se pudo verificar tu sesión. Recargá la página y probá de nuevo.');
+  }
 
   const response = await fetch(CREATE_PREFERENCE_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({
-      items: items.map(({ id, qty }) => ({ id, qty })),
+      items: items.map(({ id, qty, variantId }) => ({ id, qty, variantId: variantId || null })),
       orderId,
       backUrls: {
         success: `${window.location.origin}/pago/gracias.html`,

@@ -14,6 +14,32 @@
         document.documentElement.classList.add('dark');
       }
     })();
+    // Ídem para los colores/tipografía de marca (ver js/brand-theme.js):
+    // aplica el último tema conocido (cacheado en localStorage) antes de
+    // pintar, para no mostrar un flash con la paleta por defecto.
+    (function () {
+      try {
+        const cached = JSON.parse(localStorage.getItem('tienda_brand_theme') || 'null');
+        if (!cached) return;
+        const root = document.documentElement;
+        const vars = {
+          colorPrimary: '--color-primary',
+          colorPrimaryDark: '--color-primary-dark',
+          colorPrimaryLight: '--color-primary-light',
+          colorPrimaryBright: '--color-primary-bright',
+          colorSecondary: '--color-secondary',
+          colorSecondaryDark: '--color-secondary-dark',
+          colorBg: '--color-bg',
+          colorBorder: '--color-border',
+        };
+        Object.entries(vars).forEach(([key, cssVar]) => {
+          if (cached[key]) root.style.setProperty(cssVar, cached[key]);
+        });
+        if (cached.fontFamily) root.style.setProperty('--font-sans', `'${cached.fontFamily}'`);
+      } catch {
+        // localStorage/JSON inválido — seguimos con los valores por defecto de input.css
+      }
+    })();
   </script>
   <link rel="stylesheet" href="/css/input.css" />
 </head>
@@ -67,16 +93,51 @@
       </div>
     </div>
 
-    <!-- Categorías (Todo/Ofertas fijas + dinámicas desde Firestore) -->
+    <!-- Categorías (Inicio/Todo/Ofertas fijas + dinámicas desde Firestore) -->
     <nav id="category-nav" class="max-w-6xl mx-auto px-4 pb-3 flex gap-2 text-sm overflow-x-auto no-scrollbar">
-      <button data-category="Todo" class="category-tab category-tab-active whitespace-nowrap">Todo</button>
+      <button data-category="Inicio" class="category-tab category-tab-active whitespace-nowrap">Inicio</button>
+      <button data-category="Todo" class="category-tab whitespace-nowrap">Todo</button>
       <div id="category-tabs-dynamic" class="flex gap-2"></div>
       <button data-category="Ofertas" class="category-tab whitespace-nowrap">Ofertas</button>
     </nav>
   </header>
 
-  <!-- Grilla de productos -->
-  <main class="max-w-6xl mx-auto px-4 py-6">
+  <!-- Home: banner + destacados + categorías. Es la vista de aterrizaje;
+       "Todo" (con buscador/filtros) es una pestaña aparte, ver js/app.js#renderView. -->
+  <section id="home-view" class="max-w-6xl mx-auto px-4 py-6 flex flex-col gap-10">
+    <div class="home-hero px-6 py-12 sm:px-12 sm:py-16 flex flex-col items-start gap-4">
+      <span class="text-xs uppercase tracking-widest opacity-80">Nueva colección</span>
+      <h1 data-store-name class="text-3xl sm:text-5xl font-extrabold max-w-xl leading-tight">Mi Tienda</h1>
+      <p class="max-w-md opacity-90 text-sm sm:text-base">
+        Ropa y calzado pensado para tu día a día. Descubrí lo nuevo y las ofertas de la semana.
+      </p>
+      <button data-goto-category="Todo" class="btn-secondary w-auto px-6">Ver catálogo</button>
+    </div>
+
+    <section id="home-new-section" class="hidden flex flex-col gap-4">
+      <div class="flex items-end justify-between">
+        <h2 class="text-xl font-bold dark:text-white">Lo más nuevo</h2>
+        <button data-goto-category="Todo" class="text-sm text-primary-dark dark:text-primary-bright hover:underline">Ver todo</button>
+      </div>
+      <div id="home-new-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+    </section>
+
+    <section id="home-offers-section" class="hidden flex flex-col gap-4">
+      <div class="flex items-end justify-between">
+        <h2 class="text-xl font-bold dark:text-white">Ofertas</h2>
+        <button data-goto-category="Ofertas" class="text-sm text-primary-dark dark:text-primary-bright hover:underline">Ver todo</button>
+      </div>
+      <div id="home-offers-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+    </section>
+
+    <section id="home-categories-section" class="hidden flex flex-col gap-4">
+      <h2 class="text-xl font-bold dark:text-white">Categorías</h2>
+      <div id="home-categories-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
+    </section>
+  </section>
+
+  <!-- Catálogo: "Todo", una categoría puntual, u "Ofertas" — con buscador y grilla. -->
+  <main id="catalog-view" class="hidden max-w-6xl mx-auto px-4 py-6">
     <div id="empty-state" class="hidden text-center text-gray-400 py-16">
       No encontramos productos con ese criterio.
     </div>
@@ -84,39 +145,39 @@
     <!-- Skeleton de carga: se oculta apenas llega el primer snapshot de Firestore -->
     <div id="product-grid-skeleton" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
       <div class="product-card animate-pulse">
-        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="aspect-square bg-brand-bg"></div>
         <div class="p-4 flex flex-col gap-2">
-          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
-          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+          <div class="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-8 w-full bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
         </div>
       </div>
       <div class="product-card animate-pulse">
-        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="aspect-square bg-brand-bg"></div>
         <div class="p-4 flex flex-col gap-2">
-          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
-          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+          <div class="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-8 w-full bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
         </div>
       </div>
       <div class="product-card animate-pulse hidden sm:block">
-        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="aspect-square bg-brand-bg"></div>
         <div class="p-4 flex flex-col gap-2">
-          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
-          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+          <div class="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-8 w-full bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
         </div>
       </div>
       <div class="product-card animate-pulse hidden lg:block">
-        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="aspect-square bg-brand-bg"></div>
         <div class="p-4 flex flex-col gap-2">
-          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
-          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
-          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+          <div class="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div class="h-8 w-full bg-gray-200 dark:bg-gray-700 rounded mt-2"></div>
         </div>
       </div>
     </div>
@@ -145,33 +206,147 @@
         <span id="cart-total" class="font-extrabold text-primary-dark text-lg">$0</span>
       </div>
       <button id="cart-checkout" class="btn-primary flex items-center justify-center gap-2">
-        Pagar con Mercado Pago
+        Continuar compra
       </button>
     </div>
   </aside>
 
+  <!-- Vista de carrito de página completa: se abre desde "Continuar compra"
+       del drawer, en vez de ir directo a un popup de envío. Layout con los
+       items a la izquierda y un resumen a la derecha; el formulario de datos
+       de entrega aparece integrado ahí abajo (no en una leyenda/popup) recién
+       después de tocar "Continuar compra" del resumen y validar stock — ver
+       js/app.js#showCartView / revealShippingForm. El costo que se ve en el
+       formulario es una estimación (js/config.js#SHIPPING_COST_ESTIMATE); el
+       monto real y validado lo calcula la Cloud Function server-side. -->
+  <section id="cart-view" class="hidden max-w-6xl mx-auto px-4 py-6">
+    <button id="cart-view-back" type="button" class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white mb-4">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Seguir comprando
+    </button>
+
+    <h1 class="text-2xl font-bold mb-6 dark:text-white">Tu carrito</h1>
+
+    <div id="cart-view-empty" class="hidden text-center text-gray-400 py-16 flex flex-col items-center gap-4">
+      <p>Tu carrito está vacío.</p>
+      <button data-goto-category="Todo" type="button" class="btn-primary w-auto px-6">Ir a la tienda</button>
+    </div>
+
+    <div id="cart-view-content" class="hidden grid lg:grid-cols-3 gap-8 items-start">
+      <div id="cart-view-items" class="lg:col-span-2 surface rounded-lg p-4"></div>
+
+      <div class="surface rounded-lg shadow-sm p-5 flex flex-col gap-4 lg:sticky lg:top-24">
+        <h2 class="font-bold text-lg">Resumen</h2>
+
+        <div class="flex justify-between">
+          <span class="font-semibold">Total</span>
+          <span id="cart-view-total" class="font-extrabold text-primary-dark dark:text-primary-bright text-lg">$0</span>
+        </div>
+
+        <button id="cart-view-continue-btn" type="button" class="btn-primary flex items-center justify-center gap-2">
+          Continuar compra
+        </button>
+
+        <!-- Formulario de datos de entrega, integrado en la misma tarjeta
+             (oculto hasta tocar "Continuar compra" de arriba). -->
+        <form id="shipping-form" class="hidden flex flex-col gap-4 border-t border-brand-border dark:border-gray-700 pt-4 mt-1">
+          <h3 class="font-bold text-base -mb-1">Datos de entrega</h3>
+
+          <div>
+            <label class="text-sm font-medium block mb-1">Nombre y apellido *</label>
+            <input name="fullName" type="text" class="input-field" required />
+          </div>
+          <div>
+            <label class="text-sm font-medium block mb-1">Teléfono *</label>
+            <input name="phone" type="tel" class="input-field" placeholder="Para coordinar la entrega" required />
+          </div>
+          <div>
+            <label class="text-sm font-medium block mb-1">Email *</label>
+            <input name="email" type="email" class="input-field" placeholder="Para mandarte la confirmación de tu compra" required />
+          </div>
+
+          <div id="shipping-method-group" class="flex flex-col gap-2">
+            <label class="text-sm font-medium">Método de entrega *</label>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="method" value="delivery" checked />
+                Envío a domicilio
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="method" value="pickup" />
+                Retiro en el local
+              </label>
+            </div>
+          </div>
+
+          <div id="shipping-address-fields" class="flex flex-col gap-4">
+            <div>
+              <label class="text-sm font-medium block mb-1">Dirección *</label>
+              <input name="address" type="text" class="input-field" placeholder="Calle, número, piso/depto" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-sm font-medium block mb-1">Código postal *</label>
+                <input name="postalCode" type="text" class="input-field" />
+              </div>
+              <div>
+                <label class="text-sm font-medium block mb-1">Localidad</label>
+                <input name="city" type="text" class="input-field" />
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between text-sm pt-3 border-t border-brand-border dark:border-gray-700">
+            <span class="text-gray-500 dark:text-gray-400">Costo de envío estimado</span>
+            <span id="shipping-cost-label" class="font-semibold">$0</span>
+          </div>
+
+          <p id="shipping-form-error" class="hidden text-red-500 text-sm"></p>
+
+          <div class="flex justify-end gap-3">
+            <button type="button" id="shipping-form-back" class="text-sm text-gray-500 px-4 py-2">Volver</button>
+            <button type="submit" id="shipping-confirm-btn" class="bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md">
+              Pagar con Mercado Pago
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
   <!-- Modal de detalle de producto -->
   <div id="product-detail-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-6">
-    <div class="surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+    <div class="surface rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
       <button id="product-detail-close" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none z-10">&times;</button>
 
       <div class="grid sm:grid-cols-2 gap-0">
-        <div class="bg-gray-50 dark:bg-gray-700 aspect-square flex items-center justify-center overflow-hidden">
-          <img id="product-detail-image" src="" alt="" class="object-contain w-full h-full p-6" />
+        <div class="p-6 flex flex-col gap-3">
+          <div class="bg-brand-bg dark:bg-gray-700 aspect-square rounded-md flex items-center justify-center overflow-hidden">
+            <img id="product-detail-image" src="" alt="" class="object-contain w-full h-full p-6" />
+          </div>
+          <!-- Miniaturas: solo aparecen si el producto tiene más de una
+               imagen (`images: []`) — hoy ningún producto las tiene todavía
+               (galería de imágenes es una etapa aparte), así que este bloque
+               queda vacío/oculto sin romper nada. -->
+          <div id="product-detail-thumbs" class="hidden gap-2"></div>
         </div>
 
         <div class="p-6 flex flex-col gap-3">
-          <span id="product-detail-brand" class="text-xs text-gray-400 font-medium"></span>
-          <h2 id="product-detail-name" class="font-bold text-xl uppercase leading-snug dark:text-white"></h2>
-
           <div id="product-detail-badge-wrap" class="hidden">
             <span id="product-detail-badge" class="badge-offer w-fit"></span>
           </div>
 
+          <h2 id="product-detail-name" class="font-bold text-2xl leading-snug dark:text-white"></h2>
+          <span id="product-detail-brand" class="text-xs text-gray-400 font-medium uppercase tracking-wide"></span>
+
           <div>
-            <span id="product-detail-list-price" class="hidden text-gray-400 text-sm line-through"></span>
-            <p id="product-detail-price" class="text-primary-dark dark:text-primary-bright text-3xl font-extrabold leading-none mt-1"></p>
+            <span id="product-detail-price" class="text-primary-dark dark:text-primary-bright text-2xl font-extrabold"></span>
+            <span id="product-detail-list-price" class="hidden text-gray-400 text-base line-through ml-2"></span>
           </div>
+
+          <p id="product-detail-stock" class="text-xs font-medium"></p>
 
           <p id="product-detail-description" class="text-sm text-gray-600 dark:text-gray-300"></p>
 
@@ -180,11 +355,34 @@
             <span id="product-detail-category" class="hidden category-pill"></span>
           </div>
 
-          <p id="product-detail-stock" class="text-xs font-medium"></p>
+          <!-- Selector de variantes: solo se muestra si el producto tiene
+               `variants` (talle/color con stock propio). Un producto sin
+               variantes no muestra nada acá — sigue igual que siempre. -->
+          <div id="product-detail-variants" class="hidden flex flex-col gap-3">
+            <div id="product-detail-size-group" class="hidden">
+              <span class="text-sm font-medium block mb-2">Talle<span id="product-detail-size-selected" class="text-gray-400 font-normal"></span></span>
+              <div id="product-detail-sizes" class="flex gap-2 flex-wrap"></div>
+            </div>
+            <div id="product-detail-color-group" class="hidden">
+              <span class="text-sm font-medium block mb-2">Color<span id="product-detail-color-selected" class="text-gray-400 font-normal"></span></span>
+              <div id="product-detail-colors" class="flex gap-2 flex-wrap"></div>
+            </div>
+            <p id="product-detail-variant-hint" class="hidden text-xs text-amber-600 dark:text-amber-400"></p>
+          </div>
 
-          <button id="product-detail-add" class="btn-primary mt-auto">
-            AGREGAR AL CARRITO
-          </button>
+          <div>
+            <span class="text-sm font-medium block mb-2">Cantidad</span>
+            <div class="flex items-center gap-3 w-fit border border-brand-border dark:border-gray-600 rounded-md">
+              <button type="button" id="product-detail-qty-minus" class="px-3 py-2 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">−</button>
+              <span id="product-detail-qty-value" class="w-6 text-center text-sm">1</span>
+              <button type="button" id="product-detail-qty-plus" class="px-3 py-2 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">+</button>
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-2">
+            <button id="product-detail-add" class="btn-outline">AGREGAR AL CARRITO</button>
+            <button id="product-detail-buy" class="btn-primary">COMPRAR AHORA</button>
+          </div>
         </div>
       </div>
     </div>
@@ -194,6 +392,7 @@
   <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-2"></div>
 
   <script type="module" src="/js/theme.js"></script>
+  <script type="module" src="/js/brand-theme.js"></script>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

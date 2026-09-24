@@ -15,14 +15,31 @@
 // addToCart como updateQty usan ese tope para no dejar comprar más unidades
 // de las que había en Firestore en ese momento (el checkout revalida el
 // stock real contra Firestore antes de procesar el pago, ver checkout.js).
+//
+// VARIANTES: un producto con variantes (talle/color) puede tener más de una
+// línea en el carrito — una por variante elegida (ej: la misma remera en
+// M/Negra y en L/Negra son dos líneas distintas). Por eso una línea del
+// carrito NO se identifica solo por productId: se identifica por el par
+// (id, variantId). Un producto SIN variantes sigue usando variantId: null,
+// exactamente como antes de este cambio (una sola línea por producto).
 
 const STORAGE_PREFIX = 'tienda_cart_v1';
 let namespace = 'guest';
 
-/** @typedef {{id:string, name:string, price:number, image:string, qty:number, stock:number}} CartItem */
+/** @typedef {{id:string, variantId:?string, sku:?string, variantLabel:?string, name:string, price:number, image:string, qty:number, stock:number}} CartItem */
 
 function getStorageKey() {
   return `${STORAGE_PREFIX}:${namespace}`;
+}
+
+/** Normaliza variantId: '' y undefined cuentan como "sin variante" (null). */
+function normalizeVariantId(variantId) {
+  return variantId || null;
+}
+
+/** ¿Este item del carrito es la línea (id, variantId) pedida? */
+function isSameLine(item, id, variantId) {
+  return item.id === id && normalizeVariantId(item.variantId) === normalizeVariantId(variantId);
 }
 
 /**
@@ -79,10 +96,15 @@ export function getCartTotal() {
   return readCart().reduce((sum, item) => sum + item.price * item.qty, 0);
 }
 
+/**
+ * @param {{id:string, variantId?:string|null, sku?:string|null, variantLabel?:string|null, name:string, price:number, image?:string, stock:number}} product
+ * @param {number} qty
+ */
 export function addToCart(product, qty = 1) {
   const items = readCart();
+  const variantId = normalizeVariantId(product.variantId);
   const cap = getStockCap(product.stock);
-  const existing = items.find((item) => item.id === product.id);
+  const existing = items.find((item) => isSameLine(item, product.id, variantId));
   const previousQty = existing ? existing.qty : 0;
   const desiredQty = previousQty + qty;
   const finalQty = Math.min(desiredQty, cap);
@@ -93,6 +115,9 @@ export function addToCart(product, qty = 1) {
   } else {
     items.push({
       id: product.id,
+      variantId,
+      sku: product.sku || null,
+      variantLabel: product.variantLabel || null,
       name: product.name,
       price: product.price,
       image: product.image || '',
@@ -105,12 +130,12 @@ export function addToCart(product, qty = 1) {
   return { added: finalQty - previousQty, cappedByStock: desiredQty > cap };
 }
 
-export function updateQty(productId, qty) {
+export function updateQty(productId, qty, variantId = null) {
   let items = readCart();
   if (qty <= 0) {
-    items = items.filter((item) => item.id !== productId);
+    items = items.filter((item) => !isSameLine(item, productId, variantId));
   } else {
-    const item = items.find((i) => i.id === productId);
+    const item = items.find((i) => isSameLine(i, productId, variantId));
     if (item) {
       const cap = getStockCap(item.stock);
       item.qty = Math.min(qty, cap);
@@ -119,8 +144,8 @@ export function updateQty(productId, qty) {
   writeCart(items);
 }
 
-export function removeFromCart(productId) {
-  const items = readCart().filter((item) => item.id !== productId);
+export function removeFromCart(productId, variantId = null) {
+  const items = readCart().filter((item) => !isSameLine(item, productId, variantId));
   writeCart(items);
 }
 
@@ -130,9 +155,9 @@ export function removeFromCart(productId) {
  * ahora supera ese stock. A diferencia de updateQty, esto corrige el TOPE
  * guardado, no solo la cantidad actual.
  */
-export function syncItemStock(productId, freshStock) {
+export function syncItemStock(productId, freshStock, variantId = null) {
   const items = readCart();
-  const item = items.find((i) => i.id === productId);
+  const item = items.find((i) => isSameLine(i, productId, variantId));
   if (!item) return;
   item.stock = freshStock;
   item.qty = Math.min(item.qty, freshStock);

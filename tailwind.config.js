@@ -17,6 +17,10 @@ export default {
           light: withAlpha('--color-primary-light'),
           bright: withAlpha('--color-primary-bright'), // acentos en modo oscuro
         },
+        secondary: {
+          DEFAULT: withAlpha('--color-secondary'),
+          dark: withAlpha('--color-secondary-dark'),
+        },
         brand: {
           bg: withAlpha('--color-bg'),
           card: withAlpha('--color-card'),

@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "TU-PROYECTO-FIREBASE"
-  }
+    "default": "tienda-eccomerce-a6a40",
+    "tienda": "tienda-skilario-studio"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -40,6 +40,42 @@ export function getFinalPrice(product) {
   return hasValidOffer(product) ? product.offerPrice : product.listPrice;
 }
 
+// ---------------------------------------------------------------------------
+// Variantes (talle/color/SKU/stock propio) — mismo criterio que
+// functions/index.js (findVariant/formatVariantLabel/getFinalPrice), porque
+// el cliente y el servidor son runtimes separados y no comparten código.
+// Un producto sin `variants` (o con el array vacío) sigue siendo un
+// producto "simple", con stock propio — comportamiento idéntico al de
+// antes de agregar variantes.
+// ---------------------------------------------------------------------------
+
+export function hasVariants(product) {
+  return Array.isArray(product?.variants) && product.variants.length > 0;
+}
+
+/** Stock total: la suma de las variantes si las tiene, o el stock simple si no. */
+export function getProductStock(product) {
+  if (hasVariants(product)) {
+    return product.variants.reduce((sum, v) => sum + Number(v?.stock ?? 0), 0);
+  }
+  return Number(product?.stock ?? 0);
+}
+
+/** "M / Negra" — mismo formato en la tienda, el carrito y los mails. */
+export function formatVariantLabel(variant) {
+  if (!variant) return '';
+  return [variant?.size, variant?.color].filter(Boolean).join(' / ');
+}
+
+/** Precio a cobrar por una variante: el propio si tiene uno válido, si no el del producto. */
+export function getVariantPrice(product, variant) {
+  const variantPrice = Number(variant?.price);
+  if (variant?.price != null && Number.isFinite(variantPrice) && variantPrice > 0) {
+    return variantPrice;
+  }
+  return getFinalPrice(product);
+}
+
 /** Notificación flotante. Requiere un #toast-container en la página. */
 export function showToast(message, type = 'success', duration = 2500) {
   const container = document.getElementById('toast-container');

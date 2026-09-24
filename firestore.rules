@@ -17,6 +17,28 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Valida la forma de "shipping" en un pedido nuevo: método, nombre y
+    // teléfono siempre; dirección y código postal solo si es envío a
+    // domicilio (retiro en el local no los necesita). El COSTO no se valida
+    // acá a propósito: lo calcula la Cloud Function server-side a partir del
+    // método (ver functions/index.js#attachOrderToPreference) y recién
+    // existe después, nunca lo manda el navegador al crear el pedido.
+    function validShipping(data) {
+      return data.shipping is map
+             && data.shipping.method in ['delivery', 'pickup']
+             && data.shipping.fullName is string && data.shipping.fullName.size() > 0
+             && data.shipping.phone is string && data.shipping.phone.size() > 0
+             && data.shipping.email is string
+             && data.shipping.email.matches('^[^@\\s]+@[^@\\s]+[.][^@\\s]+$')
+             && (
+               data.shipping.method == 'pickup'
+               || (
+                 data.shipping.address is string && data.shipping.address.size() > 0
+                 && data.shipping.postalCode is string && data.shipping.postalCode.size() > 0
+               )
+             );
+    }
+
     // ---------------------------------------------------------------------
     // Productos: catálogo público de lectura, gestión de inventario 100%
     // restringida al admin (crear, editar, eliminar).
@@ -36,14 +58,40 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
+    // Configuración de la tienda (hoy: configuracion/tema — colores y
+    // tipografía editables desde el panel admin, pestaña "Estilos").
+    // Lectura pública: la necesita cualquier visitante para pintar la
+    // tienda con los colores correctos, no solo el admin. Escritura solo
+    // admin, igual que productos/categorías.
+    // ---------------------------------------------------------------------
+    match /configuracion/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------------
     // Pedidos: cualquier visitante autenticado (incluye sesión anónima,
     // que la tienda inicia automáticamente) puede crear y leer ÚNICAMENTE
     // sus propios pedidos. Nadie salvo el admin puede editarlos o listarlos
-    // todos (eso es "gestión global de pedidos").
+    // todos (eso es "gestión global de pedidos") — la Cloud Function usa el
+    // Admin SDK, que no pasa por estas reglas, para pisar items/total y para
+    // que el webhook actualice el estado y descuente stock.
+    //
+    // La validación de "create" no es solo isSignedIn(): un pedido recién
+    // creado tiene que nacer en estado 'pending', sin stock ya aplicado, y
+    // con un total/items con forma válida — así nadie puede crear desde el
+    // navegador un pedido que ya "diga" estar pagado.
     // ---------------------------------------------------------------------
     match /pedidos/{pedidoId} {
       allow create: if isSignedIn()
-                    && request.resource.data.userId == request.auth.uid;
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.stockApplied != true
+                    && request.resource.data.total is number
+                    && request.resource.data.total > 0
+                    && request.resource.data.items is list
+                    && request.resource.data.items.size() > 0
+                    && validShipping(request.resource.data);
       allow read: if isOwner(resource.data.userId) || isAdmin();
       allow update, delete: if isAdmin();
     }

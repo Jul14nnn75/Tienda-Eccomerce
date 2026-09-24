@@ -12,6 +12,31 @@
         document.documentElement.classList.add('dark');
       }
     })();
+    // Ídem para los colores/tipografía de marca (ver js/brand-theme.js): el
+    // panel también tiene que verse con el tema vigente, no con el default.
+    (function () {
+      try {
+        const cached = JSON.parse(localStorage.getItem('tienda_brand_theme') || 'null');
+        if (!cached) return;
+        const root = document.documentElement;
+        const vars = {
+          colorPrimary: '--color-primary',
+          colorPrimaryDark: '--color-primary-dark',
+          colorPrimaryLight: '--color-primary-light',
+          colorPrimaryBright: '--color-primary-bright',
+          colorSecondary: '--color-secondary',
+          colorSecondaryDark: '--color-secondary-dark',
+          colorBg: '--color-bg',
+          colorBorder: '--color-border',
+        };
+        Object.entries(vars).forEach(([key, cssVar]) => {
+          if (cached[key]) root.style.setProperty(cssVar, cached[key]);
+        });
+        if (cached.fontFamily) root.style.setProperty('--font-sans', `'${cached.fontFamily}'`);
+      } catch {
+        // localStorage/JSON inválido — seguimos con los valores por defecto de input.css
+      }
+    })();
   </script>
   <link rel="stylesheet" href="/css/input.css" />
 </head>
@@ -81,6 +106,27 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-6">
+      <!-- Aviso de reposición automática de stock por reembolso/contracargo
+           (ver functions/index.js#mercadoPagoWebhook — needsAttention) -->
+      <button
+        id="attention-banner"
+        type="button"
+        class="hidden w-full text-left mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800
+               dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 text-sm font-medium
+               hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+      >
+        ⚠️ <span id="attention-banner-text"></span> — tocá para revisar en Pedidos
+      </button>
+
+      <!-- Tabs del dashboard -->
+      <div class="flex gap-1 mb-6 border-b border-brand-border dark:border-slate-800">
+        <button data-admin-tab="products" class="admin-tab admin-tab-active">Productos</button>
+        <button data-admin-tab="orders" class="admin-tab">Pedidos</button>
+        <button data-admin-tab="sales" class="admin-tab">Ventas</button>
+        <button data-admin-tab="styles" class="admin-tab">Estilos</button>
+      </div>
+
+      <div id="products-panel">
       <!-- Métricas -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="metric-card group hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-150">
@@ -136,6 +182,14 @@
           >
             + Categoría
           </button>
+          <button
+            id="btn-import-csv"
+            class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
+                   hover:border-primary hover:text-primary dark:hover:border-primary-bright dark:hover:text-primary-bright
+                   text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap transition-colors"
+          >
+            Importar CSV
+          </button>
           <button id="btn-new-product" class="bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap">
             + Nuevo producto
           </button>
@@ -177,6 +231,143 @@
         </table>
       </div>
       <p id="products-count-label" class="text-xs text-gray-500 dark:text-slate-400 mt-3"></p>
+      </div>
+
+      <!-- Panel de Pedidos -->
+      <div id="orders-panel" class="hidden">
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+          <select id="order-status-filter" class="input-field sm:max-w-[180px]">
+            <option value="Todos">Todos los pagos</option>
+            <option value="pending">Pago pendiente</option>
+            <option value="approved">Pagado</option>
+            <option value="in_process">En proceso</option>
+            <option value="rejected">Rechazado</option>
+            <option value="refunded">Reembolsado</option>
+            <option value="charged_back">Contracargo</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+          <select id="order-fulfillment-filter" class="input-field sm:max-w-[180px]">
+            <option value="Todos">Todos los envíos</option>
+            <option value="pendiente">Sin preparar</option>
+            <option value="preparando">Preparando</option>
+            <option value="enviado">Enviado</option>
+            <option value="entregado">Entregado</option>
+          </select>
+          <input
+            id="order-search"
+            type="text"
+            placeholder="Buscar por comprador, teléfono o ID de pedido..."
+            class="input-field flex-1"
+          />
+        </div>
+
+        <div class="surface border dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
+          <table class="admin-table w-full text-sm block md:table">
+            <thead class="hidden md:table-header-group">
+              <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-brand-border dark:border-slate-800">
+                <th class="py-2 px-3">Fecha</th>
+                <th class="py-2 px-3">Comprador</th>
+                <th class="py-2 px-3">Entrega</th>
+                <th class="py-2 px-3">Total</th>
+                <th class="py-2 px-3">Pago</th>
+                <th class="py-2 px-3">Envío</th>
+                <th class="py-2 px-3"></th>
+              </tr>
+            </thead>
+            <tbody id="orders-table-body" class="block md:table-row-group"></tbody>
+          </table>
+        </div>
+        <p id="orders-count-label" class="text-xs text-gray-500 dark:text-slate-400 mt-3"></p>
+      </div>
+
+      <!-- Panel de Ventas: solo pedidos ya pagados (status === 'approved'),
+           pensado para ver de un vistazo qué se vendió y a quién — sin
+           controles de estado (eso es lo que hace la pestaña Pedidos). -->
+      <div id="sales-panel" class="hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div class="metric-card">
+            <div class="flex items-center justify-between mb-1">
+              <span class="metric-card-label">Total facturado</span>
+            </div>
+            <span id="sales-metric-total" class="metric-card-value text-primary-dark dark:text-primary-bright">$0</span>
+          </div>
+          <div class="metric-card">
+            <div class="flex items-center justify-between mb-1">
+              <span class="metric-card-label">Cantidad de ventas</span>
+            </div>
+            <span id="sales-metric-count" class="metric-card-value">0</span>
+          </div>
+        </div>
+
+        <input
+          id="sales-search"
+          type="text"
+          placeholder="Buscar por comprador, teléfono o producto..."
+          class="input-field mb-4"
+        />
+
+        <div class="surface border dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
+          <table class="admin-table w-full text-sm block md:table">
+            <thead class="hidden md:table-header-group">
+              <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-brand-border dark:border-slate-800">
+                <th class="py-2 px-3">Fecha</th>
+                <th class="py-2 px-3">Comprador</th>
+                <th class="py-2 px-3">Productos</th>
+                <th class="py-2 px-3">Entrega</th>
+                <th class="py-2 px-3">Total</th>
+                <th class="py-2 px-3"></th>
+              </tr>
+            </thead>
+            <tbody id="sales-table-body" class="block md:table-row-group"></tbody>
+          </table>
+        </div>
+        <p id="sales-count-label" class="text-xs text-gray-500 dark:text-slate-400 mt-3"></p>
+      </div>
+
+      <!-- Panel de Estilos: colores + tipografía de la tienda, guardados en
+           Firestore (configuracion/tema) para que se vean iguales para
+           cualquier visitante — no es una preferencia local del admin.
+           Ver js/brand-theme.js. -->
+      <div id="styles-panel" class="hidden max-w-xl">
+        <h2 class="font-bold text-lg mb-1">Estilos de la tienda</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          Cambiá la paleta de colores y la tipografía del catálogo, la ficha de producto y este mismo panel.
+          Se aplica para todos los visitantes apenas guardás.
+        </p>
+
+        <form id="styles-form" class="surface border dark:border-slate-800 rounded-lg shadow-sm p-5 flex flex-col gap-5">
+          <div>
+            <label class="text-sm font-medium block mb-1">Paleta de colores</label>
+            <select id="styles-palette-select" class="input-field"></select>
+          </div>
+
+          <div id="styles-custom-colors" class="hidden grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm font-medium block mb-1">Color primario</label>
+              <input id="styles-custom-primary" type="color" class="input-field h-10 p-1" value="#1f2937" />
+            </div>
+            <div>
+              <label class="text-sm font-medium block mb-1">Color secundario (acento)</label>
+              <input id="styles-custom-secondary" type="color" class="input-field h-10 p-1" value="#b5793c" />
+            </div>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium block mb-1">Tipografía</label>
+            <select id="styles-font-select" class="input-field"></select>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium block mb-2">Vista previa</span>
+            <div id="styles-preview" class="flex items-center gap-2 flex-wrap"></div>
+          </div>
+
+          <p id="styles-form-error" class="hidden text-red-500 text-sm"></p>
+          <p id="styles-form-success" class="hidden text-primary-dark dark:text-primary-bright text-sm"></p>
+
+          <button type="submit" id="styles-save-btn" class="btn-primary w-fit px-6">Guardar estilos</button>
+        </form>
+      </div>
     </main>
   </section>
 
@@ -214,14 +405,41 @@
           <input name="offerPrice" type="number" min="0" step="0.01" class="input-field" placeholder="Vacío = sin oferta" />
         </div>
 
-        <div>
-          <label class="text-sm font-medium block mb-1">Stock</label>
-          <input name="stock" type="number" min="0" step="1" class="input-field" value="0" />
+        <div class="col-span-2 flex items-center gap-2 pt-1">
+          <input id="field-has-variants" type="checkbox" class="w-4 h-4 rounded border-brand-border text-primary focus:ring-primary" />
+          <label for="field-has-variants" class="text-sm font-medium">
+            Este producto tiene variantes (talle / color, con stock y SKU propios)
+          </label>
         </div>
 
-        <div>
-          <label class="text-sm font-medium block mb-1">Variante</label>
-          <input name="variant" type="text" class="input-field" placeholder="Ej: color, talle, tamaño" />
+        <!-- Modo simple: un único stock para todo el producto (compatible con productos existentes). -->
+        <div id="simple-stock-fields" class="contents">
+          <div>
+            <label class="text-sm font-medium block mb-1">Stock</label>
+            <input name="stock" type="number" min="0" step="1" class="input-field" value="0" />
+          </div>
+
+          <div>
+            <label class="text-sm font-medium block mb-1">Variante</label>
+            <input name="variant" type="text" class="input-field" placeholder="Ej: color, talle, tamaño" />
+          </div>
+        </div>
+
+        <!-- Modo variantes: cada fila es talle/color/SKU con su propio stock (y precio opcional). -->
+        <div id="variants-editor" class="hidden col-span-2">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-medium">Variantes</label>
+            <button type="button" id="btn-add-variant" class="text-xs font-semibold text-primary hover:underline">
+              + Agregar variante
+            </button>
+          </div>
+          <div class="hidden md:grid grid-cols-[1fr_1fr_1.4fr_0.8fr_1fr_28px] gap-2 text-xs text-gray-400 mb-1 px-1">
+            <span>Talle</span><span>Color</span><span>SKU</span><span>Stock</span><span>Precio (opcional)</span><span></span>
+          </div>
+          <div id="variant-rows" class="flex flex-col gap-2"></div>
+          <p class="text-xs text-gray-400 mt-2">
+            El SKU identifica cada variante puntual y no puede repetirse. El precio es opcional: si lo dejás vacío, se usa el precio del producto.
+          </p>
         </div>
 
         <div class="col-span-2">
@@ -309,10 +527,148 @@
     </div>
   </div>
 
+  <!-- Modal de importación de productos por CSV -->
+  <div id="csv-import-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4 py-6">
+    <div class="surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Importar productos desde CSV</h3>
+        <button type="button" id="btn-close-csv-modal" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4 overflow-y-auto flex-1 flex flex-col gap-4 text-sm">
+        <div>
+          <p class="text-gray-500 dark:text-gray-400 mb-2">
+            El archivo tiene que tener estas columnas (no importa el orden, ni mayúsculas/tildes):
+          </p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="category-pill">NOMBRE *</span>
+            <span class="category-pill">PRECIO DE LISTA *</span>
+            <span class="category-pill">MARCA</span>
+            <span class="category-pill">CATEGORIA</span>
+            <span class="category-pill">STOCK</span>
+            <span class="category-pill">VARIANTE</span>
+            <span class="category-pill">DESCRIPCION</span>
+            <span class="category-pill">PRECIO DE OFERTA</span>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">
+            * obligatorias. Si una categoría no existe todavía, se crea sola. Productos con el mismo nombre + variante que uno ya cargado se omiten para no duplicar.
+          </p>
+          <button type="button" id="btn-download-csv-template" class="text-xs text-primary hover:underline mt-2">
+            Descargar plantilla de ejemplo (.csv)
+          </button>
+        </div>
+
+        <div>
+          <input id="csv-file-input" type="file" accept=".csv,text/csv" class="input-field" />
+        </div>
+
+        <div id="csv-import-summary" class="hidden text-xs px-3 py-2 rounded-lg border"></div>
+
+        <div id="csv-import-errors" class="hidden flex flex-col gap-1 max-h-40 overflow-y-auto text-xs px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10"></div>
+
+        <div id="csv-import-preview-wrap" class="hidden">
+          <p class="font-semibold mb-1">Vista previa (<span id="csv-preview-count"></span>)</p>
+          <div class="border border-brand-border dark:border-slate-800 rounded-lg overflow-hidden overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50 dark:bg-slate-800/60">
+                <tr class="text-left">
+                  <th class="py-1.5 px-2">Nombre</th>
+                  <th class="py-1.5 px-2">Marca</th>
+                  <th class="py-1.5 px-2">Categoría</th>
+                  <th class="py-1.5 px-2">Precio</th>
+                  <th class="py-1.5 px-2">Stock</th>
+                  <th class="py-1.5 px-2">Variante</th>
+                </tr>
+              </thead>
+              <tbody id="csv-preview-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border dark:border-slate-800 flex justify-end gap-3">
+        <button type="button" id="btn-cancel-csv-import" class="text-sm text-gray-500 px-4 py-2">Cancelar</button>
+        <button
+          type="button"
+          id="btn-confirm-csv-import"
+          disabled
+          class="bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-md"
+        >
+          Importar productos
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de detalle de pedido (solo lectura, salvo el estado de envío) -->
+  <div id="order-detail-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4 py-6">
+    <div class="surface rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Detalle del pedido</h3>
+        <button type="button" id="order-detail-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4 flex flex-col gap-4 text-sm">
+        <div id="order-detail-attention" class="hidden flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 text-xs">
+          <span>⚠️ Se repuso stock automáticamente por un reembolso/contracargo.</span>
+          <button type="button" id="order-detail-ack-btn" class="font-semibold underline whitespace-nowrap">Marcar como revisado</button>
+        </div>
+
+        <div class="flex justify-between items-start">
+          <div>
+            <p id="order-detail-id" class="font-mono text-xs text-gray-400"></p>
+            <p id="order-detail-date" class="text-gray-500 dark:text-gray-400"></p>
+          </div>
+          <span id="order-detail-status-badge"></span>
+        </div>
+
+        <div>
+          <h4 class="font-semibold mb-1">Comprador</h4>
+          <p id="order-detail-buyer"></p>
+        </div>
+
+        <div>
+          <h4 class="font-semibold mb-1">Entrega</h4>
+          <p id="order-detail-shipping-method"></p>
+          <p id="order-detail-shipping-address" class="text-gray-500 dark:text-gray-400"></p>
+        </div>
+
+        <div>
+          <h4 class="font-semibold mb-1">Productos</h4>
+          <div id="order-detail-items" class="flex flex-col gap-1"></div>
+        </div>
+
+        <div class="border-t border-brand-border dark:border-slate-800 pt-3 flex flex-col gap-1">
+          <div class="flex justify-between text-gray-500 dark:text-gray-400">
+            <span>Envío</span>
+            <span id="order-detail-shipping-cost"></span>
+          </div>
+          <div class="flex justify-between font-bold text-base">
+            <span>Total</span>
+            <span id="order-detail-total"></span>
+          </div>
+        </div>
+
+        <div id="order-detail-payment-info" class="text-xs text-gray-400 border-t border-brand-border dark:border-slate-800 pt-3"></div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Estado de envío</label>
+          <select id="order-detail-fulfillment-select" class="input-field">
+            <option value="pendiente">Sin preparar</option>
+            <option value="preparando">Preparando</option>
+            <option value="enviado">Enviado</option>
+            <option value="entregado">Entregado</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Contenedor de toasts -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col-reverse gap-2"></div>
 
   <script type="module" src="/js/theme.js"></script>
+  <script type="module" src="/js/brand-theme.js"></script>
   <script type="module" src="/js/admin.js"></script>
 </body>
 </html>
