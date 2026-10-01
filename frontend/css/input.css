@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-gray-800 antialiased transition-colors duration-150
+           dark:bg-gray-900 dark:text-gray-100;
+  }
+}
+
+@layer components {
+  .product-card {
+    @apply bg-brand-card border border-brand-border rounded-lg overflow-hidden flex flex-col justify-between
+           transition-shadow duration-150 hover:shadow-md
+           dark:bg-gray-800 dark:border-gray-700;
+  }
+
+  .badge-offer {
+    @apply inline-flex items-center gap-1 bg-brand-green-light text-brand-green-dark
+           text-xs font-bold px-2 py-0.5 rounded
+           dark:bg-emerald-600 dark:text-white;
+  }
+
+  .btn-primary {
+    @apply w-full bg-brand-green hover:bg-brand-green-dark text-white font-semibold
+           py-2.5 rounded-md transition-all duration-150 active:scale-95;
+  }
+    .btn-secondary {
+    @apply w-full bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20
+           text-amber-700 dark:text-amber-400 font-semibold border border-amber-200 dark:border-amber-500/20
+           py-2.5 rounded-md transition-all duration-150 active:scale-95;
+  }
+
+  /* --- Selector de método de entrega (retiro / envío) --- */
+  .shipping-option {
+    @apply flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg border
+           border-brand-border dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400
+           hover:border-brand-green dark:hover:border-emerald-400 transition-colors duration-150;
+  }
+  .shipping-option-active {
+    @apply bg-brand-green-light dark:bg-emerald-500/10 border-brand-green dark:border-emerald-400
+           text-brand-green-dark dark:text-emerald-400;
+  }
+
+  .input-field {
+    @apply w-full border border-brand-border rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-brand-green
+           dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:placeholder-gray-500;
+  }
+
+  .surface {
+    @apply bg-white border-brand-border dark:bg-gray-800 dark:border-gray-700;
+  }
+
+  /* --- Panel admin: botones de ícono (editar/eliminar) --- */
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors duration-150;
+  }
+  .icon-btn-edit {
+    @apply icon-btn text-gray-500 hover:text-blue-600 hover:bg-blue-50
+           dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-500/10;
+  }
+  .icon-btn-delete {
+    @apply icon-btn text-gray-500 hover:text-red-600 hover:bg-red-50
+           dark:text-slate-400 dark:hover:text-red-400 dark:hover:bg-red-500/10;
+  }
+
+  .stock-badge {
+    @apply inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full border;
+  }
+  .stock-badge-ok {
+    @apply stock-badge bg-emerald-50 text-emerald-700 border-emerald-200
+           dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20;
+  }
+  .stock-badge-low {
+    @apply stock-badge bg-amber-50 text-amber-700 border-amber-200
+           dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20;
+  }
+  .stock-badge-out {
+    @apply stock-badge bg-red-50 text-red-700 border-red-200
+           dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20;
+  }
+  .stock-badge-info {
+    @apply stock-badge bg-sky-50 text-sky-700 border-sky-200
+           dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20;
+  }
+  .stock-badge-progress {
+    @apply stock-badge bg-violet-50 text-violet-700 border-violet-200
+           dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20;
+  }
+  .stock-badge-done {
+    @apply stock-badge bg-slate-100 text-slate-600 border-slate-200
+           dark:bg-slate-700/40 dark:text-slate-300 dark:border-slate-700;
+  }
+
+  .category-pill {
+    @apply inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full
+           bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300;
+  }
+    /* --- Tabs de categoría del header de la tienda --- */
+  .category-tab {
+    @apply px-3.5 py-1.5 rounded-full font-medium text-gray-600 dark:text-gray-300
+           hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150;
+  }
+  .category-tab-active {
+    @apply bg-brand-green text-white hover:bg-brand-green;
+  }
+
+  /* --- Pestañas Productos/Pedidos del admin --- */
+  .admin-tab {
+    @apply px-4 py-2.5 -mb-px border-b-2 border-transparent font-semibold text-sm
+           text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors;
+  }
+  .admin-tab-active {
+    @apply border-brand-green text-brand-green-dark dark:text-emerald-400;
+  }
+
+  /* --- Cards de métricas del dashboard --- */
+  .metric-card {
+    @apply surface border rounded-lg p-4 flex flex-col gap-1 shadow-sm dark:border-slate-800;
+  }
+  .metric-card-value {
+    @apply text-2xl font-extrabold;
+  }
+  .metric-card-label {
+    @apply text-xs text-gray-500 dark:text-gray-400 font-medium;
+  }
+
+  /* --- Toasts --- */
+  .toast {
+    @apply flex items-center gap-2 surface border shadow-lg rounded-lg px-4 py-3 text-sm font-medium
+           min-w-[240px] animate-toast-in;
+  }
+  .toast-success {
+    @apply border-l-4 border-l-brand-green;
+  }
+  .toast-error {
+    @apply border-l-4 border-l-red-500;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out;
+}
+
+/* Oculta la scrollbar nativa en contenedores con scroll horizontal
+   (nav de categorías, filas de scroll) sin perder la funcionalidad. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tabla del admin: en mobile cada <td> muestra su nombre de columna
+   (ej. "Marca: Star Nutrition") ya que la tabla se apila como tarjetas.
+   A partir de md, vuelve a ser una tabla normal y estas etiquetas se ocultan. */
+@media (max-width: 767px) {
+  .admin-table td[data-label]::before {
+    content: attr(data-label) ': ';
+    font-weight: 600;
+    color: #9ca3af;
+    display: inline-block;
+    min-width: 90px;
+  }
+}
+
+/* Resalta brevemente la fila de un pedido que acaba de entrar (mientras el
+   admin tiene la pestaña de Pedidos abierta), para que se note sin recargar. */
+@keyframes new-order-pulse {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(16, 185, 129, 0.12); }
+}
+.new-order-row {
+  animation: new-order-pulse 1.2s ease-in-out 2;
+}
+
+/* En mobile, la tabla de pedidos se apila como tarjetas — un poco más de
+   aire entre filas y un tamaño de toque más cómodo para los botones. */
+@media (max-width: 767px) {
+  #orders-table-body tr {
+    padding: 0.85rem;
+  }
+  #orders-table-body td[data-label]::before {
+    display: block;
+    margin-bottom: 0.15rem;
+  }
+}

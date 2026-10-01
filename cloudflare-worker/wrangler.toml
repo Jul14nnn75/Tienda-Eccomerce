@@ -1,0 +1,7 @@
+name = "tienda-generica-pagos"
+main = "src/index.js"
+compatibility_date = "2026-09-24"
+
+[vars]
+FIREBASE_PROJECT_ID = "tu-project-id-de-firebase"
+STATEMENT_DESCRIPTOR = "MI TIENDA"

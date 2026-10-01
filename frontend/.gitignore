@@ -1,0 +1,38 @@
+# Dependencias
+node_modules
+functions/node_modules
+
+# Build de Vite
+dist
+.vite
+.vite-cache
+
+# Variables de entorno (NUNCA subir credenciales)
+.env
+.env.local
+.env.*.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.firebase-adminsdk*.json
+scripts/service-account.json
+scripts/node_modules
+
+# Editor / SO
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Coverage / testing (por si se agrega más adelante)
+coverage
