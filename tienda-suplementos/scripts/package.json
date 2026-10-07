@@ -1,0 +1,8 @@
+{
+  "name": "scripts",
+  "private": true,
+  "description": "Scripts administrativos de uso único (no se deployan)",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

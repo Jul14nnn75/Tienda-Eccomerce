@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>¡Gracias por tu compra!</title>
+  <script>
+    (function () {
+      const stored = localStorage.getItem('tienda_theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored ? stored === 'dark' : prefersDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/input.css" />
+</head>
+<body class="min-h-screen flex items-center justify-center px-4">
+  <div class="surface border rounded-lg shadow-sm p-8 max-w-md w-full text-center">
+    <div class="text-5xl mb-4">✅</div>
+    <h1 class="text-xl font-extrabold mb-2">¡Gracias por tu compra!</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+      Tu pago fue procesado por Mercado Pago. Te vamos a contactar apenas confirmemos el pedido.
+    </p>
+    <a href="/" class="btn-primary inline-block">Volver a la tienda</a>
+  </div>
+
+  <script type="module">
+    import { clearCart } from '/js/cart.js';
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('collection_status') || params.get('status');
+    if (!status || status === 'approved' || status === 'pending' || status === 'in_process') {
+      clearCart();
+    }
+  </script>
+</body>
+</html>

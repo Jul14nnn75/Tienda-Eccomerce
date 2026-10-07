@@ -1,0 +1,26 @@
+# Dependencias y builds
+node_modules/
+dist/
+.vite/
+
+# Cloudflare Worker (estado local y secretos de desarrollo)
+.wrangler/
+.dev.vars
+
+# Credenciales: NUNCA se suben
+.env
+.env.*
+!.env.example
+service-account.json
+*.firebase-adminsdk*.json
+
+# Firebase
+.firebase/
+*-debug.log
+
+# Editor / sistema
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

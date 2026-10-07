@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // El admin se identifica por un custom claim (admin: true) en su token,
+    // NO por email hardcodeado (eso sería fácil de falsificar/copiar).
+    // Ver scripts/set-admin-claim.js para asignarlo.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ---------------------------------------------------------------------
+    // Productos: catálogo público de lectura, gestión de inventario 100%
+    // restringida al admin (crear, editar, eliminar).
+    // ---------------------------------------------------------------------
+    match /productos/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // Categorías: lectura pública (las usa el filtro de la tienda y del
+    // admin), creación/edición/borrado solo admin.
+    // ---------------------------------------------------------------------
+    match /categorias/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // Pedidos: cualquier visitante autenticado (incluye sesión anónima,
+    // que la tienda inicia automáticamente) puede crear y leer ÚNICAMENTE
+    // sus propios pedidos. Nadie salvo el admin puede editarlos o listarlos
+    // todos (eso es "gestión global de pedidos").
+    // ---------------------------------------------------------------------
+    match /pedidos/{pedidoId} {
+      // El pedido nace siempre "pending": marcarlo pagado y guardar el total
+      // verificado es tarea exclusiva del Worker de pagos (cuenta de servicio).
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.total is number
+                    && request.resource.data.total > 0
+                    && request.resource.data.items is list
+                    && request.resource.data.items.size() > 0
+                    && request.resource.data.items.size() <= 50
+                    && !request.resource.data.keys().hasAny(['paidAt', 'verifiedTotal']);
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------------
+    // Configuración de la tienda (ej: config/envios con las zonas y costos
+    // de envío): lectura pública, edición solo admin.
+    // ---------------------------------------------------------------------
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Cualquier otra colección: denegado por defecto (no hay regla explícita
+    // que la habilite, así que Firestore la deniega automáticamente).
+  }
+}

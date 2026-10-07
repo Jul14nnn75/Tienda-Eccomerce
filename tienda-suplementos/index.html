@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>%TIENDA_TITLE%</title>
+  <script>
+    // Se ejecuta antes de pintar para evitar el "flash" del tema incorrecto
+    (function () {
+      const stored = localStorage.getItem('tienda_theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored ? stored === 'dark' : prefersDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/input.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="surface border-b sticky top-0 z-30 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between gap-4">
+      <a href="/" class="flex items-center gap-2 flex-shrink-0">
+        %TIENDA_LOGO%
+      </a>
+
+      <div class="flex-1 relative max-w-md mx-auto">
+        <input
+          id="search-input"
+          type="text"
+          placeholder="Buscar productos..."
+          class="input-field pl-9 rounded-full bg-gray-50 dark:bg-gray-900/50 border-transparent focus:bg-white dark:focus:bg-gray-800"
+        />
+        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <!-- Toggle de tema claro/oscuro -->
+        <button data-theme-toggle class="p-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="Cambiar tema">
+          <svg data-theme-icon="sun" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 3v1.5m0 15V21m9-9h-1.5M4.5 12H3m15.36-6.36l-1.06 1.06M6.7 17.66l-1.06 1.06m0-13.32l1.06 1.06M17.66 17.66l1.06 1.06M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+          </svg>
+          <svg data-theme-icon="moon" class="hidden w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+          </svg>
+        </button>
+
+        <button id="cart-button" class="relative flex items-center gap-1.5 pl-3 pr-3.5 py-2 rounded-full bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span id="cart-count" class="hidden bg-white text-brand-primary-dark text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Categorías -->
+    <nav id="category-nav" class="max-w-6xl mx-auto px-4 pb-3 flex gap-2 text-sm overflow-x-auto no-scrollbar">
+      <button data-category="Todo" class="category-tab category-tab-active whitespace-nowrap">Todo</button>
+      <div id="category-tabs-dynamic" class="flex gap-2"></div>
+      <button data-category="Ofertas" class="category-tab whitespace-nowrap">Ofertas</button>
+    </nav>
+  </header>
+
+  <!-- Grilla de productos -->
+  %TIENDA_HERO%
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <div id="empty-state" class="hidden text-center text-gray-400 py-16">
+      No encontramos productos con ese criterio.
+    </div>
+
+    <!-- Skeleton de carga: se oculta apenas llega el primer snapshot de Firestore -->
+    <div id="product-grid-skeleton" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div class="product-card animate-pulse">
+        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="p-4 flex flex-col gap-2">
+          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
+          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+        </div>
+      </div>
+      <div class="product-card animate-pulse">
+        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="p-4 flex flex-col gap-2">
+          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
+          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+        </div>
+      </div>
+      <div class="product-card animate-pulse hidden sm:block">
+        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="p-4 flex flex-col gap-2">
+          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
+          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+        </div>
+      </div>
+      <div class="product-card animate-pulse hidden lg:block">
+        <div class="aspect-square bg-gray-800/40 rounded-xl"></div>
+        <div class="p-4 flex flex-col gap-2">
+          <div class="h-3 w-16 bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-full bg-gray-700/50 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-700/50 rounded"></div>
+          <div class="h-8 w-full bg-gray-700/50 rounded mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="product-grid" class="hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+  </main>
+
+  %TIENDA_FOOTER%
+
+  <!-- Drawer del carrito -->
+  <div id="cart-overlay" class="hidden fixed inset-0 bg-black/40 z-40"></div>
+  <aside
+    id="cart-drawer"
+    class="fixed top-0 right-0 h-full w-full sm:w-96 surface z-50 shadow-xl
+           transform translate-x-full transition-transform duration-300 flex flex-col"
+  >
+    <div class="flex items-center justify-between px-4 py-3 border-b border-brand-border dark:border-gray-700">
+      <h2 class="font-bold text-lg">Tu carrito</h2>
+      <button id="cart-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+
+    <div id="cart-items" class="cart-scroll flex-1 overflow-y-auto px-4"></div>
+    <p id="cart-empty-msg" class="hidden text-center text-gray-400 py-10">Tu carrito está vacío.</p>
+
+    <!-- Envío: retiro en el local o a domicilio -->
+    <div id="shipping-section" class="px-4 pt-3 border-t border-brand-border dark:border-gray-700">
+      <h3 class="text-sm font-bold mb-2 flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-brand-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17" />
+        </svg>
+        Entrega
+      </h3>
+
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button
+          type="button"
+          id="shipping-pickup-btn"
+          data-shipping-method="pickup"
+          class="shipping-option shipping-option-active"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9.5L12 3l9 6.5M4.5 10.5V20a1 1 0 001 1h13a1 1 0 001-1v-9.5" />
+          </svg>
+          Retiro en el local
+        </button>
+        <button
+          type="button"
+          id="shipping-delivery-btn"
+          data-shipping-method="delivery"
+          class="shipping-option"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          Envío a domicilio
+        </button>
+      </div>
+
+      <!-- Info de retiro (visible por defecto) -->
+      <p id="pickup-info" class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+        %TIENDA_PICKUP_TEXT%
+      </p>
+
+      <!-- Formulario de dirección (oculto hasta elegir "Envío a domicilio") -->
+      <div id="delivery-form" class="hidden flex flex-col gap-2 mb-3">
+        <input id="shipping-address" type="text" placeholder="Calle y número" class="input-field text-sm" />
+        <div class="grid grid-cols-2 gap-2">
+          <input id="shipping-city" type="text" placeholder="Localidad" class="input-field text-sm" />
+          <input id="shipping-zip" type="text" placeholder="Código postal" class="input-field text-sm" />
+        </div>
+        <p id="shipping-address-error" class="hidden text-red-500 text-xs"></p>
+        <!-- El texto lo arma js/app.js con los costos de tienda.config.js -->
+        <p id="shipping-cost-info" class="text-xs text-gray-400"></p>
+      </div>
+
+      <!-- Datos de contacto: siempre hacen falta, incluso para retiro en el local -->
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="customer-name" type="text" placeholder="Nombre y apellido" class="input-field text-sm" />
+        <input id="customer-phone" type="tel" placeholder="Teléfono" class="input-field text-sm" />
+      </div>
+      <input id="customer-email" type="email" placeholder="Email" class="input-field text-sm mb-3" />
+      <p id="customer-info-error" class="hidden text-red-500 text-xs -mt-2 mb-3"></p>
+    </div>
+
+    <div class="border-t border-brand-border dark:border-gray-700 p-4">
+      <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
+        <span>Subtotal</span>
+        <span id="cart-subtotal">$0</span>
+      </div>
+      <div id="cart-shipping-row" class="hidden flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
+        <span>Envío</span>
+        <span id="cart-shipping-cost">$0</span>
+      </div>
+      <div class="flex justify-between mb-3">
+        <span class="font-semibold">Total</span>
+        <span id="cart-total" class="font-extrabold text-brand-primary-dark text-lg">$0</span>
+      </div>
+      <button id="cart-checkout-card" class="btn-primary flex items-center justify-center gap-2 mb-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <path stroke-linecap="round" d="M2 10h20" />
+        </svg>
+        Pagar con tarjeta
+      </button>
+      <button id="cart-checkout" class="btn-secondary flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+        Transferencia bancaria
+      </button>
+    </div>
+  </aside>
+
+  <!-- Modal de detalle de producto -->
+  <div id="product-detail-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-6">
+    <div class="surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+      <button id="product-detail-close" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none z-10">&times;</button>
+
+      <div class="grid sm:grid-cols-2 gap-0">
+        <div class="bg-gray-50 dark:bg-gray-700 aspect-square flex items-center justify-center overflow-hidden">
+          <img id="product-detail-image" src="" alt="" class="object-contain w-full h-full p-6" />
+        </div>
+
+        <div class="p-6 flex flex-col gap-3">
+          <span id="product-detail-brand" class="text-xs text-gray-400 font-medium"></span>
+          <h2 id="product-detail-name" class="font-bold text-xl uppercase leading-snug dark:text-white"></h2>
+
+          <div id="product-detail-badge-wrap" class="hidden">
+            <span id="product-detail-badge" class="badge-offer w-fit"></span>
+          </div>
+
+          <div>
+            <span id="product-detail-list-price" class="hidden text-gray-400 text-sm line-through"></span>
+            <p id="product-detail-price" class="text-brand-primary-dark dark:text-brand-accent text-3xl font-extrabold leading-none mt-1"></p>
+          </div>
+
+          <p id="product-detail-description" class="text-sm text-gray-600 dark:text-gray-300"></p>
+
+          <div class="flex flex-wrap gap-2 text-xs">
+            <span id="product-detail-flavor" class="hidden category-pill"></span>
+            <span id="product-detail-category" class="hidden category-pill"></span>
+          </div>
+
+          <p id="product-detail-stock" class="text-xs font-medium"></p>
+
+          <button id="product-detail-add" class="btn-primary mt-auto">
+            AGREGAR AL CARRITO
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de pago con tarjeta (Card Payment Brick de Mercado Pago) -->
+  <div id="card-payment-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-6">
+    <div class="surface rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-gray-700 flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-lg bg-brand-primary/15 dark:bg-brand-accent/15 flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4 text-brand-primary-dark dark:text-brand-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <path stroke-linecap="round" d="M2 10h20" />
+          </svg>
+        </span>
+        <h3 class="font-bold text-lg flex-1">Pagar con tarjeta</h3>
+        <button id="card-payment-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4">
+        <p id="card-payment-error" class="hidden text-red-500 text-sm mb-3"></p>
+        <p id="card-payment-result" class="hidden text-sm mb-3"></p>
+        <div id="cardPaymentBrick_container"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Contenedor de toasts -->
+  <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-2"></div>
+
+  <script src="https://sdk.mercadopago.com/js/v2"></script>
+  <script type="module" src="/js/theme.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

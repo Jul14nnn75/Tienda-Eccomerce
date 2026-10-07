@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard | %TIENDA_NAME%</title>
+  <script>
+    (function () {
+      const stored = localStorage.getItem('tienda_theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored ? stored === 'dark' : prefersDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/input.css" />
+</head>
+<body class="bg-brand-bg dark:bg-gray-900 min-h-screen transition-colors duration-150">
+
+  <!-- Se muestra mientras Firebase Auth resuelve si hay sesión activa (evita flash de login) -->
+  <div id="auth-checking" class="min-h-screen flex items-center justify-center text-gray-400 text-sm">
+    Verificando sesión...
+  </div>
+
+  <!-- Pantalla de login -->
+  <section id="login-screen" class="hidden min-h-screen flex items-center justify-center px-4">
+    <form id="login-form" class="surface border rounded-lg shadow-sm p-8 w-full max-w-sm">
+      <h1 class="text-xl font-extrabold mb-1">Dashboard</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Ingresá tus credenciales para continuar.</p>
+
+      <label class="text-sm font-medium block mb-1">Email</label>
+      <input name="email" type="email" class="input-field mb-4" autocomplete="username" required />
+
+      <label class="text-sm font-medium block mb-1">Contraseña</label>
+      <input name="password" type="password" class="input-field mb-2" autocomplete="current-password" required />
+
+      <button type="button" id="forgot-password-link" class="text-xs text-brand-primary hover:underline mb-4 block">
+        ¿Olvidaste o querés cambiar tu contraseña?
+      </button>
+
+      <p id="login-error" class="hidden text-red-500 text-sm mb-4"></p>
+      <p id="login-info" class="hidden text-brand-primary-dark dark:text-brand-accent text-sm mb-4"></p>
+
+      <button type="submit" id="login-submit-btn" class="btn-primary">Ingresar</button>
+    </form>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dashboard" class="hidden">
+    <header class="surface border-b dark:border-slate-800 sticky top-0 z-30 shadow-sm">
+      <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-lg bg-brand-primary flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+            </svg>
+          </span>
+          <div class="leading-tight">
+            <h1 class="font-extrabold text-lg tracking-tight">%TIENDA_NAME%</h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Panel de administración</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener"
+            class="hidden sm:inline-block text-sm font-semibold text-brand-primary-dark dark:text-brand-accent hover:underline whitespace-nowrap"
+          >
+            Ver tienda →
+          </a>
+          <button data-theme-toggle class="p-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="Cambiar tema">
+            <svg data-theme-icon="sun" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 3v1.5m0 15V21m9-9h-1.5M4.5 12H3m15.36-6.36l-1.06 1.06M6.7 17.66l-1.06 1.06m0-13.32l1.06 1.06M17.66 17.66l1.06 1.06M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+            </svg>
+            <svg data-theme-icon="moon" class="hidden w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+            </svg>
+          </button>
+          <span class="w-px h-6 bg-brand-border dark:bg-slate-800"></span>
+          <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-full bg-brand-primary/15 dark:bg-brand-accent/15 text-brand-primary-dark dark:text-brand-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
+              A
+            </span>
+            <button id="logout-btn" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6">
+      <!-- Selector de sección -->
+      <div class="flex gap-2 mb-6 border-b border-brand-border dark:border-slate-800 overflow-x-auto no-scrollbar">
+        <button id="tab-summary" class="admin-tab admin-tab-active">Resumen</button>
+        <button id="tab-products" class="admin-tab">Productos</button>
+        <button id="tab-orders" class="admin-tab">
+          Pedidos
+          <span id="orders-pending-badge" class="hidden ml-1.5 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full inline-flex items-center justify-center align-middle">0</span>
+        </button>
+        <button id="tab-shipping" class="admin-tab">Envíos</button>
+      </div>
+
+      <!-- ============================== RESUMEN ============================== -->
+      <div id="view-summary">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div class="metric-card">
+            <span class="metric-card-label">Vendido hoy</span>
+            <span id="metric-sales-today" class="metric-card-value">$0</span>
+            <span id="metric-orders-today" class="text-xs text-gray-400">Sin ventas todavía</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-card-label">Últimos 7 días</span>
+            <span id="metric-sales-week" class="metric-card-value">$0</span>
+            <span id="metric-sales-week-delta" class="text-xs text-gray-400"></span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-card-label">Este mes</span>
+            <span id="metric-sales-month" class="metric-card-value">$0</span>
+            <span id="metric-orders-month" class="text-xs text-gray-400"></span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-card-label">Ticket promedio del mes</span>
+            <span id="metric-avg-ticket" class="metric-card-value">$0</span>
+            <span class="text-xs text-gray-400">Por pedido pagado</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm lg:col-span-2">
+            <h3 class="text-sm font-bold mb-4">Ventas de los últimos 7 días</h3>
+            <div id="sales-chart" class="flex items-end justify-between gap-2 h-44"></div>
+          </div>
+          <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm">
+            <h3 class="text-sm font-bold mb-3">Productos más vendidos</h3>
+            <div id="top-products-list" class="flex flex-col gap-2.5 text-sm"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="text-sm font-bold">Pedidos para atender</h3>
+              <button type="button" data-go-tab="orders" class="text-xs font-semibold text-brand-primary-dark dark:text-brand-accent hover:underline">
+                Ver todos →
+              </button>
+            </div>
+            <div id="summary-orders-todo" class="flex flex-col text-sm"></div>
+          </div>
+          <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="text-sm font-bold">Stock bajo o agotado</h3>
+              <button type="button" data-go-tab="products" class="text-xs font-semibold text-brand-primary-dark dark:text-brand-accent hover:underline">
+                Ver productos →
+              </button>
+            </div>
+            <div id="summary-low-stock" class="flex flex-col text-sm"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================= PRODUCTOS ============================= -->
+      <div id="view-products" class="hidden">
+      <!-- Métricas -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="metric-card group hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-150">
+          <div class="flex items-center justify-between mb-1">
+            <span class="metric-card-label">Total de productos</span>
+            <span class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-gray-500 dark:text-slate-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.27 6.96 12 12.01l8.73-5.05" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 22.08V12" />
+              </svg>
+            </span>
+          </div>
+          <span id="metric-total" class="metric-card-value">0</span>
+        </div>
+
+        <div class="metric-card group hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-150">
+          <div class="flex items-center justify-between mb-1">
+            <span class="metric-card-label">Productos en oferta</span>
+            <span class="w-8 h-8 rounded-lg bg-brand-primary-light dark:bg-brand-accent/10 flex items-center justify-center text-brand-primary-dark dark:text-brand-accent">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+                <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+              </svg>
+            </span>
+          </div>
+          <span id="metric-ofertas" class="metric-card-value text-brand-primary-dark dark:text-brand-accent">0</span>
+        </div>
+
+        <div class="metric-card group hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-150">
+          <div class="flex items-center justify-between mb-1">
+            <span class="metric-card-label">Stock bajo / agotado</span>
+            <span class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01" />
+              </svg>
+            </span>
+          </div>
+          <span id="metric-stock-bajo" class="metric-card-value text-amber-600 dark:text-amber-400">0</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="font-bold text-lg">Productos</h2>
+        <div class="flex items-center gap-2">
+          <button
+            id="btn-manage-categories"
+            class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
+                   hover:border-brand-primary hover:text-brand-primary dark:hover:border-brand-accent dark:hover:text-brand-accent
+                   text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap transition-colors"
+          >
+            + Categoría
+          </button>
+          <button id="btn-new-product" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap">
+            + Nuevo producto
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <select id="category-filter" class="input-field sm:max-w-[200px]">
+          <option value="Todas">Todas las categorías</option>
+        </select>
+        <input
+          id="product-search"
+          type="text"
+          placeholder="Buscar por nombre o marca..."
+          class="input-field flex-1"
+        />
+      </div>
+
+      <div class="surface border dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
+        <table class="admin-table w-full text-sm block md:table">
+          <thead class="hidden md:table-header-group">
+            <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-brand-border dark:border-slate-800">
+              <th class="py-2 px-3">Img</th>
+              <th class="py-2 px-3 cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-200" data-sort="name">
+                Nombre <span data-sort-icon="name" class="inline-block w-3 text-brand-primary"></span>
+              </th>
+              <th class="py-2 px-3">Marca</th>
+              <th class="py-2 px-3">Categoría</th>
+              <th class="py-2 px-3 cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-200" data-sort="price">
+                Precio <span data-sort-icon="price" class="inline-block w-3 text-brand-primary"></span>
+              </th>
+              <th class="py-2 px-3 cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-200" data-sort="stock">
+                Stock <span data-sort-icon="stock" class="inline-block w-3 text-brand-primary"></span>
+              </th>
+              <th class="py-2 px-3"></th>
+            </tr>
+          </thead>
+          <tbody id="products-table-body" class="block md:table-row-group"></tbody>
+        </table>
+      </div>
+      <p id="products-count-label" class="text-xs text-gray-500 dark:text-slate-400 mt-3"></p>
+      </div>
+
+      <!-- ============================== PEDIDOS =============================== -->
+      <div id="view-orders" class="hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="metric-card">
+            <div class="flex items-center justify-between mb-1">
+              <span class="metric-card-label">Pendientes de pago</span>
+              <span class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="9" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />
+                </svg>
+              </span>
+            </div>
+            <span id="metric-orders-pending" class="metric-card-value text-amber-600 dark:text-amber-400">0</span>
+          </div>
+          <div class="metric-card">
+            <div class="flex items-center justify-between mb-1">
+              <span class="metric-card-label">En proceso</span>
+              <span class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center text-sky-600 dark:text-sky-400">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.27 6.96 12 12.01l8.73-5.05" />
+                </svg>
+              </span>
+            </div>
+            <span id="metric-orders-progress" class="metric-card-value text-sky-600 dark:text-sky-400">0</span>
+          </div>
+          <div class="metric-card">
+            <div class="flex items-center justify-between mb-1">
+              <span class="metric-card-label">Completados</span>
+              <span class="w-8 h-8 rounded-lg bg-brand-primary-light dark:bg-brand-accent/10 flex items-center justify-center text-brand-primary-dark dark:text-brand-accent">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+            </div>
+            <span id="metric-orders-completed" class="metric-card-value text-brand-primary-dark dark:text-brand-accent">0</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            id="orders-search"
+            type="text"
+            placeholder="Buscar por cliente o teléfono..."
+            class="input-field flex-1"
+          />
+          <select id="orders-date-filter" class="input-field sm:max-w-[170px]">
+            <option value="Todos">Todas las fechas</option>
+            <option value="today">Hoy</option>
+            <option value="week">Últimos 7 días</option>
+            <option value="month">Este mes</option>
+          </select>
+          <select id="orders-status-filter" class="input-field sm:max-w-[200px]">
+            <option value="Todos">Todos los estados</option>
+            <option value="pending">Pendientes de pago</option>
+            <option value="paid">Pagados</option>
+            <option value="preparing">Preparando</option>
+            <option value="ready">Listos / enviados</option>
+            <option value="completed">Completados</option>
+            <option value="abandoned">Abandonados (sin pagar)</option>
+          </select>
+          <button
+            id="btn-export-orders"
+            class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
+                   hover:border-brand-primary hover:text-brand-primary dark:hover:border-brand-accent dark:hover:text-brand-accent
+                   text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap transition-colors"
+          >
+            Exportar CSV
+          </button>
+        </div>
+
+        <div class="surface border dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
+          <table class="admin-table w-full text-sm block md:table">
+            <thead class="hidden md:table-header-group">
+              <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-brand-border dark:border-slate-800">
+                <th class="py-2 px-3">Fecha</th>
+                <th class="py-2 px-3">Cliente</th>
+                <th class="py-2 px-3">Productos</th>
+                <th class="py-2 px-3">Entrega</th>
+                <th class="py-2 px-3">Total</th>
+                <th class="py-2 px-3">Estado</th>
+                <th class="py-2 px-3"></th>
+              </tr>
+            </thead>
+            <tbody id="orders-table-body" class="block md:table-row-group"></tbody>
+          </table>
+        </div>
+        <p id="orders-count-label" class="text-xs text-gray-500 dark:text-slate-400 mt-3"></p>
+      </div>
+
+      <!-- =============================== ENVÍOS =============================== -->
+      <div id="view-shipping" class="hidden max-w-3xl">
+        <h2 class="font-bold text-lg mb-1">Envíos a domicilio</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          El costo se calcula según el código postal que escribe el comprador. Los cambios se aplican en la tienda apenas guardás.
+        </p>
+
+        <form id="shipping-form" class="flex flex-col gap-5">
+          <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="shipping-default-cost" class="text-sm font-medium block mb-1">Costo de envío general</label>
+              <input id="shipping-default-cost" type="number" min="0" step="1" class="input-field" required />
+              <p class="text-xs text-gray-400 mt-1">Se cobra cuando el código postal no está en ninguna zona.</p>
+            </div>
+            <div>
+              <label for="shipping-free-from" class="text-sm font-medium block mb-1">Envío gratis desde</label>
+              <input id="shipping-free-from" type="number" min="0" step="1" class="input-field" required />
+              <p class="text-xs text-gray-400 mt-1">Monto de compra desde el que no se cobra envío. Con 0 se cobra siempre.</p>
+            </div>
+            <label class="sm:col-span-2 flex items-start gap-2 text-sm cursor-pointer">
+              <input id="shipping-only-zones" type="checkbox" class="mt-0.5" />
+              <span>
+                Enviar solo a las zonas cargadas
+                <span class="block text-xs text-gray-400">Si el código postal no está en ninguna zona, el comprador solo puede elegir retiro en el local.</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-3 mb-1">
+              <h3 class="text-sm font-bold">Zonas</h3>
+              <button
+                type="button"
+                id="btn-add-zone"
+                class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
+                       hover:border-brand-primary hover:text-brand-primary dark:hover:border-brand-accent dark:hover:text-brand-accent
+                       text-sm font-semibold px-3 py-1.5 rounded-md whitespace-nowrap transition-colors"
+              >
+                + Zona
+              </button>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">
+              En códigos postales podés poner varios separados por coma y también rangos: <span class="font-mono">1228, 1400-1499</span>.
+              Si un código está en dos zonas, vale la que esté más arriba.
+            </p>
+            <div id="shipping-zones-list" class="flex flex-col gap-3"></div>
+            <p id="shipping-zones-empty" class="text-sm text-gray-400 py-3">
+              Todavía no hay zonas: todos los envíos pagan el costo general.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button type="submit" id="shipping-save-btn" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
+              Guardar envíos
+            </button>
+            <p id="shipping-form-error" class="hidden text-red-500 text-sm"></p>
+          </div>
+        </form>
+      </div>
+    </main>
+  </section>
+
+  <!-- Modal CRUD Producto -->
+  <div id="product-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+    <form id="product-form" class="surface rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-gray-700 flex items-center justify-between">
+        <h3 id="modal-title" class="font-bold text-lg">Nuevo producto</h3>
+        <button type="button" id="btn-cancel-modal" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4 grid grid-cols-2 gap-4">
+        <div class="col-span-2">
+          <label class="text-sm font-medium block mb-1">Nombre *</label>
+          <input name="name" type="text" class="input-field" required />
+        </div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Marca</label>
+          <input name="brand" type="text" class="input-field" />
+        </div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Categoría</label>
+          <select id="field-category" name="category" class="input-field"></select>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Precio de lista *</label>
+          <input name="listPrice" type="number" min="0" step="0.01" class="input-field" required />
+        </div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Precio oferta / transferencia</label>
+          <input name="offerPrice" type="number" min="0" step="0.01" class="input-field" placeholder="Vacío = sin oferta" />
+        </div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Stock</label>
+          <input name="stock" type="number" min="0" step="1" class="input-field" value="0" />
+        </div>
+
+        <div>
+          <label class="text-sm font-medium block mb-1">Sabor</label>
+          <input name="flavor" type="text" class="input-field" />
+        </div>
+
+        <div class="col-span-2">
+          <label class="text-sm font-medium block mb-1">Descripción</label>
+          <textarea name="description" rows="3" class="input-field"></textarea>
+        </div>
+
+        <label class="col-span-2 flex items-start gap-2 text-sm cursor-pointer">
+          <input name="active" type="checkbox" class="mt-0.5" checked />
+          <span>
+            Visible en la tienda
+            <span class="block text-xs text-gray-400">Destildalo para pausar el producto sin borrarlo: deja de mostrarse y de venderse.</span>
+          </span>
+        </label>
+
+        <div class="col-span-2">
+          <label class="text-sm font-medium block mb-1">Imagen (URL directa)</label>
+          <input id="field-image-url" type="text" class="input-field" placeholder="https://..." />
+        </div>
+
+        <div class="col-span-2">
+          <label class="text-sm font-medium block mb-1">
+            ...o subir archivo (requiere Firebase Storage configurado)
+          </label>
+          <input id="field-image-file" type="file" accept="image/*" class="input-field" />
+        </div>
+
+        <div class="col-span-2">
+          <img id="image-preview" class="hidden w-24 h-24 object-contain bg-gray-50 border border-brand-border rounded" />
+        </div>
+
+        <p id="form-error" class="hidden col-span-2 text-red-500 text-sm"></p>
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border dark:border-gray-700 flex justify-end gap-3">
+        <button type="button" id="btn-cancel-modal-2" class="text-sm text-gray-500 px-4 py-2">
+          Cancelar
+        </button>
+        <button type="submit" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md">
+          Guardar producto
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal de confirmación (eliminar producto o categoría) -->
+  <div id="confirm-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+    <div class="surface rounded-lg shadow-xl w-full max-w-sm p-6">
+      <h3 id="confirm-modal-title" class="font-bold text-lg mb-2">¿Eliminar producto?</h3>
+      <p id="confirm-modal-text" class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        Esta acción no se puede deshacer.
+      </p>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="confirm-modal-cancel" class="text-sm text-gray-500 px-4 py-2">
+          Cancelar
+        </button>
+        <button type="button" id="confirm-modal-accept" class="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-5 py-2 rounded-md">
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de gestión de categorías -->
+  <div id="categories-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+    <div class="surface rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Gestionar categorías</h3>
+        <button type="button" id="btn-close-categories-modal" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div id="categories-list" class="px-6 py-4 flex-1 overflow-y-auto flex flex-col gap-2"></div>
+
+      <div class="px-6 py-4 border-t border-brand-border dark:border-slate-800">
+        <div class="flex gap-2">
+          <input
+            id="new-category-input"
+            type="text"
+            placeholder="Nombre de la categoría"
+            class="input-field flex-1"
+            maxlength="40"
+          />
+          <button
+            type="button"
+            id="btn-confirm-category"
+            class="flex-shrink-0 px-4 rounded-md bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold"
+          >
+            Agregar
+          </button>
+        </div>
+        <p id="new-category-error" class="hidden text-red-500 text-xs mt-1"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de detalle de pedido -->
+  <div id="order-detail-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+    <div class="surface rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Detalle del pedido</h3>
+        <button type="button" id="order-detail-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4 flex flex-col gap-4">
+        <div>
+          <span id="order-detail-status" class="stock-badge-ok"></span>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-gray-400 uppercase mb-1">Cliente</h4>
+          <p id="order-detail-customer" class="text-sm"></p>
+          <a
+            id="order-detail-whatsapp"
+            href="#"
+            target="_blank"
+            rel="noopener"
+            class="hidden inline-block mt-2 text-sm font-semibold text-brand-primary-dark dark:text-brand-accent hover:underline"
+          >
+            Escribirle por WhatsApp →
+          </a>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-gray-400 uppercase mb-1">Entrega</h4>
+          <p id="order-detail-shipping" class="text-sm whitespace-pre-line"></p>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-gray-400 uppercase mb-1">Productos</h4>
+          <div id="order-detail-items" class="flex flex-col gap-1.5 text-sm"></div>
+        </div>
+
+        <div class="flex justify-between border-t border-brand-border dark:border-slate-800 pt-3">
+          <span class="font-semibold">Total</span>
+          <span id="order-detail-total" class="font-extrabold text-brand-primary-dark dark:text-brand-accent"></span>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border dark:border-slate-800 flex items-center gap-3">
+        <select id="order-detail-status-select" class="input-field text-sm flex-1">
+          <option value="pending">Pendiente de pago</option>
+          <option value="paid">Pagado</option>
+          <option value="preparing">Preparando</option>
+          <option value="ready">Listo / enviado</option>
+          <option value="completed">Completado</option>
+        </select>
+        <button type="button" id="order-detail-save-status" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenedor de toasts -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col-reverse gap-2"></div>
+
+  <script type="module" src="/js/theme.js"></script>
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

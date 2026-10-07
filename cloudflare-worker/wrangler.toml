@@ -1,0 +1,8 @@
+name = "tienda-suplementos-pagos"
+main = "src/index.js"
+compatibility_date = "2026-09-24"
+
+[vars]
+FIREBASE_PROJECT_ID = "tienda-suplementos-3ddde"
+# Dominio de la tienda. "*" permite cualquier origen: usalo solo en desarrollo.
+ALLOWED_ORIGIN = "*"
