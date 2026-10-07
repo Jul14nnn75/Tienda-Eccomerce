@@ -4,5 +4,11 @@ compatibility_date = "2026-09-24"
 
 [vars]
 FIREBASE_PROJECT_ID = "tienda-suplementos-3ddde"
-# Dominio de la tienda. "*" permite cualquier origen: usalo solo en desarrollo.
+# Dominios que pueden llamar al Worker, separados por coma. "*" permite
+# cualquiera: usalo solo en desarrollo. Con la tienda publicada, por ejemplo:
+#   ALLOWED_ORIGIN = "https://mitienda.com.ar,http://localhost:5173"
 ALLOWED_ORIGIN = "*"
+# "true" rechaza las notificaciones de Mercado Pago cuya firma no coincide.
+# Activalo recién cuando en los logs del Worker ("npx wrangler tail") deje de
+# aparecer el aviso de firma en los pagos reales.
+REQUIRE_WEBHOOK_SIGNATURE = "false"

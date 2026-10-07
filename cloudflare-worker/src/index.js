@@ -541,8 +541,9 @@ async function markOrderPaidAndDecrementStock(env, accessToken, orderId, items) 
  * (HMAC-SHA256 sobre "id:<data.id lowercased>;request-id:<header>;ts:<header>;").
  * Confirmado con soporte técnico que los datos de entrada (request-id, ts,
  * data.id, secret) llegan correctos — el mismatch queda pendiente de
- * resolver con Mercado Pago. Mientras tanto, handleWebhook solo advierte en
- * vez de bloquear (ver TODO ahí).
+ * resolver con Mercado Pago. Hasta entonces handleWebhook solo lo registra,
+ * salvo que REQUIRE_WEBHOOK_SIGNATURE esté en "true" (ver ahí por qué el
+ * cobro igual queda protegido).
  */
 async function verifyMpSignature(request, env, dataId) {
   const signatureHeader = request.headers.get('x-signature') || '';
@@ -584,14 +585,25 @@ async function handleWebhook(request, env) {
     return new Response('ok', { status: 200 });
   }
 
+  // El id va a parar a la URL de la API de Mercado Pago: solo letras y números.
+  if (!/^[A-Za-z0-9]{1,64}$/.test(dataId)) {
+    return new Response('ok', { status: 200 });
+  }
+
+  // La notificación no se toma como verdad: más abajo se consulta el pago a
+  // Mercado Pago con el Access Token del comercio, y solo se marca "pagado"
+  // si está aprobado, corresponde a ese pedido y cubre el total verificado.
+  // Una notificación falsa no puede inventar un pago, así que la firma es una
+  // segunda barrera. Se exige con REQUIRE_WEBHOOK_SIGNATURE = "true" en
+  // wrangler.toml, una vez confirmado en los logs que las firmas reales
+  // coinciden (si no, se rechazarían avisos de pagos legítimos).
   const signatureOk = await verifyMpSignature(request, env, dataId);
   if (!signatureOk) {
-    // TODO: esto tiene que volver a bloquear (return 401) antes de manejar
-    // dinero real — por ahora solo advierte, porque la firma no cierra con
-    // ninguna combinación documentada y hay que confirmarlo con soporte de
-    // Mercado Pago. Sin este bloqueo, cualquiera que sepa la URL podría
-    // simular un pago aprobado.
-    console.error('ADVERTENCIA: firma de webhook no coincide, se procesa igual (temporal).');
+    if (env.REQUIRE_WEBHOOK_SIGNATURE === 'true') {
+      console.error('Webhook rechazado: la firma no coincide.');
+      return new Response('firma inválida', { status: 401 });
+    }
+    console.error('Aviso: la firma del webhook no coincide; se verifica el pago contra Mercado Pago igual.');
   }
 
   try {
@@ -667,7 +679,13 @@ async function handleWebhook(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    allowedOrigin = env.ALLOWED_ORIGIN || '*';
+    // ALLOWED_ORIGIN admite varios dominios separados por coma (el de la
+    // tienda y, por ejemplo, http://localhost:5173 para desarrollo). Si el
+    // pedido viene de uno de la lista se le responde con ese; si no, con el
+    // primero, y el navegador bloquea la respuesta.
+    const origins = (env.ALLOWED_ORIGIN || '*').split(',').map((origin) => origin.trim()).filter(Boolean);
+    const requestOrigin = request.headers.get('Origin');
+    allowedOrigin = origins.includes('*') ? '*' : origins.includes(requestOrigin) ? requestOrigin : origins[0];
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders() });

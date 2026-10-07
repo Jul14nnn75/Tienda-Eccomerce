@@ -96,7 +96,12 @@ npx wrangler secret put FIREBASE_PRIVATE_KEY
   del proyecto → Cuentas de servicio → Generar nueva clave privada.
 
 En `wrangler.toml`, cambiar `name` (un Worker por cliente), `FIREBASE_PROJECT_ID`
-y `ALLOWED_ORIGIN` (el dominio final de la tienda, ej. `https://mitienda.com.ar`).
+y `ALLOWED_ORIGIN` (el dominio final de la tienda, ej. `https://mitienda.com.ar`;
+admite varios separados por coma).
+
+`REQUIRE_WEBHOOK_SIGNATURE` arranca en `"false"`: el Worker igual confirma cada
+pago consultándolo a Mercado Pago. Pasarlo a `"true"` cuando `npx wrangler tail`
+ya no muestre el aviso de firma en pagos reales.
 
 ```bash
 npm run deploy
