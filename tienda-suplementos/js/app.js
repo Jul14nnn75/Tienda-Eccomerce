@@ -93,6 +93,9 @@ const cardPaymentError = document.getElementById('card-payment-error');
 const cardPaymentResult = document.getElementById('card-payment-result');
 
 const cartEmptyMsg = document.getElementById('cart-empty-msg');
+const cartDrawerCount = document.getElementById('cart-drawer-count');
+const cartCheckoutSections = document.getElementById('cart-checkout-sections');
+const cardPaymentAmount = document.getElementById('card-payment-amount');
 const toastContainer = document.getElementById('toast-container');
 
 const detailModal = document.getElementById('product-detail-modal');
@@ -349,6 +352,10 @@ function renderCartDrawer() {
   const items = getCart();
   cartItemsContainer.innerHTML = '';
 
+  const units = items.reduce((sum, item) => sum + item.qty, 0);
+  cartDrawerCount.textContent = units === 0 ? '' : units === 1 ? '1 producto' : `${units} productos`;
+  cartCheckoutSections.classList.toggle('hidden', items.length === 0);
+
   if (items.length === 0) {
     cartEmptyMsg.classList.remove('hidden');
     [cartCheckoutBtn, cartCheckoutCardBtn].forEach((btn) => {
@@ -365,24 +372,33 @@ function renderCartDrawer() {
     items.forEach((item) => {
       const atMax = Number.isFinite(item.stock) && item.qty >= item.stock;
       const row = document.createElement('div');
-      row.className = 'flex items-center gap-3 py-3 border-b border-brand-border dark:border-gray-700';
+      row.className = 'flex gap-3 py-4 border-b last:border-b-0 border-brand-border dark:border-gray-700';
       row.innerHTML = `
-        <img src="${item.image || 'https://placehold.co/64x64'}" alt="${item.name}"
-             class="w-14 h-14 object-contain bg-gray-50 dark:bg-gray-700 rounded-md flex-shrink-0" />
+        <img src="${escapeHtml(item.image || 'https://placehold.co/64x64')}" alt=""
+             class="w-16 h-16 object-contain bg-white rounded-lg border border-brand-border dark:border-gray-700 p-1 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold line-clamp-2">${item.name}</p>
-          <p class="text-brand-primary-dark dark:text-brand-accent font-bold text-sm">${formatPrice(item.price)}</p>
-          <div class="flex items-center gap-2 mt-1">
-            <button class="w-6 h-6 border border-brand-border dark:border-gray-600 rounded text-sm" data-qty-minus="${item.id}">−</button>
-            <span class="text-sm w-6 text-center">${item.qty}</span>
-            <button
-              class="w-6 h-6 border border-brand-border dark:border-gray-600 rounded text-sm ${atMax ? 'opacity-40 cursor-not-allowed' : ''}"
-              data-qty-plus="${item.id}"
-              ${atMax ? 'disabled title="Alcanzaste el stock disponible"' : ''}
-            >+</button>
-            <button class="text-xs text-gray-400 hover:text-red-500 ml-2" data-remove="${item.id}">Quitar</button>
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-semibold leading-snug line-clamp-2">${escapeHtml(item.name)}</p>
+            <button class="p-1 -mt-1 -mr-1 rounded text-gray-400 hover:text-red-500 transition-colors flex-shrink-0" data-remove="${item.id}" aria-label="Quitar del carrito" title="Quitar">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg>
+            </button>
           </div>
-          ${atMax ? `<p class="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Stock máximo alcanzado</p>` : ''}
+          <div class="flex items-center justify-between gap-2 mt-2">
+            <div class="inline-flex items-center rounded-md border border-brand-border dark:border-gray-600">
+              <button class="w-7 h-7 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-l-md" data-qty-minus="${item.id}" aria-label="Restar una unidad">−</button>
+              <span class="text-sm w-7 text-center font-semibold">${item.qty}</span>
+              <button
+                class="w-7 h-7 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-r-md ${atMax ? 'opacity-40 cursor-not-allowed' : ''}"
+                data-qty-plus="${item.id}"
+                aria-label="Sumar una unidad"
+                ${atMax ? 'disabled title="Alcanzaste el stock disponible"' : ''}
+              >+</button>
+            </div>
+            <p class="text-brand-primary-dark dark:text-brand-accent font-bold text-sm">${formatPrice(item.price * item.qty)}</p>
+          </div>
+          ${atMax ? `<p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">Stock máximo alcanzado</p>` : ''}
         </div>
       `;
       cartItemsContainer.appendChild(row);
@@ -798,6 +814,9 @@ cartCheckoutCardBtn?.addEventListener('click', async () => {
     closeCartDrawer();
     cardPaymentModal.classList.remove('hidden');
 
+    const isDark = document.documentElement.classList.contains('dark');
+    cardPaymentAmount.textContent = formatPrice(amount);
+
     const mp = getMercadoPago();
     await unmountCardBrick();
 
@@ -805,7 +824,26 @@ cartCheckoutCardBtn?.addEventListener('click', async () => {
       initialization: { amount, payer: { email: state.customerEmail.trim() } },
       customization: {
         visual: {
-          style: { theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default' },
+          hideFormTitle: true,
+          texts: { formSubmit: `Pagar ${formatPrice(amount)}` },
+          style: {
+            theme: isDark ? 'dark' : 'default',
+            // Colores de tienda.config.js, para que el formulario de Mercado
+            // Pago no desentone con el resto del sitio.
+            customVariables: {
+              baseColor: tienda.theme.primary,
+              baseColorFirstVariant: tienda.theme.primaryDark,
+              baseColorSecondVariant: tienda.theme.primaryDark,
+              buttonTextColor: '#ffffff',
+              formBackgroundColor: isDark ? '#1f2937' : '#ffffff',
+              inputBackgroundColor: isDark ? '#111827' : '#ffffff',
+              textPrimaryColor: isDark ? '#f3f4f6' : '#111827',
+              textSecondaryColor: isDark ? '#9ca3af' : '#6b7280',
+              formPadding: '0px',
+              borderRadiusMedium: '8px',
+              borderRadiusLarge: '10px',
+            },
+          },
         },
       },
       callbacks: {

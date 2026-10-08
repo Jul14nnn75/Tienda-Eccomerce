@@ -125,78 +125,120 @@
   <div id="cart-overlay" class="hidden fixed inset-0 bg-black/40 z-40"></div>
   <aside
     id="cart-drawer"
-    class="fixed top-0 right-0 h-full w-full sm:w-96 surface z-50 shadow-xl
+    class="fixed top-0 right-0 h-full w-full sm:w-[26rem] surface z-50 shadow-2xl
            transform translate-x-full transition-transform duration-300 flex flex-col"
+    aria-label="Carrito de compras"
   >
-    <div class="flex items-center justify-between px-4 py-3 border-b border-brand-border dark:border-gray-700">
-      <h2 class="font-bold text-lg">Tu carrito</h2>
-      <button id="cart-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+    <div class="flex items-center justify-between px-5 py-4 border-b border-brand-border dark:border-gray-700">
+      <div class="flex items-baseline gap-2">
+        <h2 class="font-bold text-lg">Tu carrito</h2>
+        <span id="cart-drawer-count" class="text-xs text-gray-400"></span>
+      </div>
+      <button id="cart-close" class="p-1.5 -mr-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700 transition-colors" aria-label="Cerrar carrito">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
 
-    <div id="cart-items" class="cart-scroll flex-1 overflow-y-auto px-4"></div>
-    <p id="cart-empty-msg" class="hidden text-center text-gray-400 py-10">Tu carrito está vacío.</p>
+    <!-- Todo el contenido desplaza junto: en pantallas bajas no queda nada apretado -->
+    <div class="thin-scroll flex-1 overflow-y-auto">
+      <div id="cart-items" class="px-5"></div>
 
-    <!-- Envío: retiro en el local o a domicilio -->
-    <div id="shipping-section" class="px-4 pt-3 border-t border-brand-border dark:border-gray-700">
-      <h3 class="text-sm font-bold mb-2 flex items-center gap-1.5">
-        <svg class="w-4 h-4 text-brand-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17" />
-        </svg>
-        Entrega
-      </h3>
-
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <button
-          type="button"
-          id="shipping-pickup-btn"
-          data-shipping-method="pickup"
-          class="shipping-option shipping-option-active"
-        >
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9.5L12 3l9 6.5M4.5 10.5V20a1 1 0 001 1h13a1 1 0 001-1v-9.5" />
-          </svg>
-          Retiro en el local
-        </button>
-        <button
-          type="button"
-          id="shipping-delivery-btn"
-          data-shipping-method="delivery"
-          class="shipping-option"
-        >
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <div id="cart-empty-msg" class="hidden text-center px-5 py-16">
+        <span class="w-14 h-14 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-700/60 flex items-center justify-center text-gray-400">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
-          Envío a domicilio
-        </button>
+        </span>
+        <p class="font-semibold">Tu carrito está vacío</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Sumá productos para empezar tu compra.</p>
       </div>
 
-      <!-- Info de retiro (visible por defecto) -->
-      <p id="pickup-info" class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        %TIENDA_PICKUP_TEXT%
-      </p>
+      <div id="cart-checkout-sections">
+        <!-- Envío: retiro en el local o a domicilio -->
+        <div id="shipping-section" class="px-5 py-5 border-t border-brand-border dark:border-gray-700">
+          <h3 class="cart-section-title"><span class="cart-step">1</span>Entrega</h3>
 
-      <!-- Formulario de dirección (oculto hasta elegir "Envío a domicilio") -->
-      <div id="delivery-form" class="hidden flex flex-col gap-2 mb-3">
-        <input id="shipping-address" type="text" placeholder="Calle y número" class="input-field text-sm" />
-        <div class="grid grid-cols-2 gap-2">
-          <input id="shipping-city" type="text" placeholder="Localidad" class="input-field text-sm" />
-          <input id="shipping-zip" type="text" placeholder="Código postal" class="input-field text-sm" />
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <button
+              type="button"
+              id="shipping-pickup-btn"
+              data-shipping-method="pickup"
+              class="shipping-option shipping-option-active"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9l1.5-5h15L21 9M4 9v10a1 1 0 001 1h14a1 1 0 001-1V9M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0M9 20v-6h6v6" />
+              </svg>
+              Retiro en el local
+            </button>
+            <button
+              type="button"
+              id="shipping-delivery-btn"
+              data-shipping-method="delivery"
+              class="shipping-option"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M1 5h13v10H1V5zm13 3h4l4 4v3h-8V8z" />
+                <circle cx="6" cy="17.5" r="1.8" />
+                <circle cx="18" cy="17.5" r="1.8" />
+              </svg>
+              Envío a domicilio
+            </button>
+          </div>
+
+          <!-- Info de retiro (visible por defecto) -->
+          <p id="pickup-info" class="text-xs text-gray-500 dark:text-gray-400">
+            %TIENDA_PICKUP_TEXT%
+          </p>
+
+          <!-- Formulario de dirección (oculto hasta elegir "Envío a domicilio") -->
+          <div id="delivery-form" class="hidden flex flex-col gap-2">
+            <div>
+              <label for="shipping-address" class="field-label">Calle y número</label>
+              <input id="shipping-address" type="text" autocomplete="street-address" class="input-field text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="shipping-city" class="field-label">Localidad</label>
+                <input id="shipping-city" type="text" autocomplete="address-level2" class="input-field text-sm" />
+              </div>
+              <div>
+                <label for="shipping-zip" class="field-label">Código postal</label>
+                <input id="shipping-zip" type="text" inputmode="numeric" autocomplete="postal-code" class="input-field text-sm" />
+              </div>
+            </div>
+            <p id="shipping-address-error" class="hidden text-red-500 text-xs"></p>
+            <!-- El texto lo arma js/app.js con los costos de envío configurados -->
+            <p id="shipping-cost-info" class="text-xs text-gray-400"></p>
+          </div>
         </div>
-        <p id="shipping-address-error" class="hidden text-red-500 text-xs"></p>
-        <!-- El texto lo arma js/app.js con los costos de tienda.config.js -->
-        <p id="shipping-cost-info" class="text-xs text-gray-400"></p>
-      </div>
 
-      <!-- Datos de contacto: siempre hacen falta, incluso para retiro en el local -->
-      <div class="grid grid-cols-2 gap-2 mb-2">
-        <input id="customer-name" type="text" placeholder="Nombre y apellido" class="input-field text-sm" />
-        <input id="customer-phone" type="tel" placeholder="Teléfono" class="input-field text-sm" />
+        <!-- Datos de contacto: siempre hacen falta, incluso para retiro en el local -->
+        <div class="px-5 py-5 border-t border-brand-border dark:border-gray-700">
+          <h3 class="cart-section-title"><span class="cart-step">2</span>Tus datos</h3>
+          <div class="flex flex-col gap-2">
+            <div>
+              <label for="customer-name" class="field-label">Nombre y apellido</label>
+              <input id="customer-name" type="text" autocomplete="name" class="input-field text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="customer-phone" class="field-label">Teléfono</label>
+                <input id="customer-phone" type="tel" autocomplete="tel" class="input-field text-sm" />
+              </div>
+              <div>
+                <label for="customer-email" class="field-label">Email</label>
+                <input id="customer-email" type="email" autocomplete="email" class="input-field text-sm" />
+              </div>
+            </div>
+            <p id="customer-info-error" class="hidden text-red-500 text-xs"></p>
+          </div>
+        </div>
       </div>
-      <input id="customer-email" type="email" placeholder="Email" class="input-field text-sm mb-3" />
-      <p id="customer-info-error" class="hidden text-red-500 text-xs -mt-2 mb-3"></p>
     </div>
 
-    <div class="border-t border-brand-border dark:border-gray-700 p-4">
+    <div class="border-t border-brand-border dark:border-gray-700 px-5 py-4 bg-gray-50 dark:bg-gray-900/40">
       <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
         <span>Subtotal</span>
         <span id="cart-subtotal">$0</span>
@@ -205,9 +247,9 @@
         <span>Envío</span>
         <span id="cart-shipping-cost">$0</span>
       </div>
-      <div class="flex justify-between mb-3">
+      <div class="flex items-baseline justify-between mt-2 mb-4">
         <span class="font-semibold">Total</span>
-        <span id="cart-total" class="font-extrabold text-brand-primary-dark text-lg">$0</span>
+        <span id="cart-total" class="font-extrabold text-2xl text-brand-primary-dark dark:text-brand-accent">$0</span>
       </div>
       <button id="cart-checkout-card" class="btn-primary flex items-center justify-center gap-2 mb-2">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -218,10 +260,17 @@
       </button>
       <button id="cart-checkout" class="btn-secondary flex items-center justify-center gap-2">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M4 10h16M5 10v8m4-8v8m6-8v8m4-8v8M12 3l9 5H3l9-5z" />
         </svg>
         Transferencia bancaria
       </button>
+      <p class="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-3">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path stroke-linecap="round" d="M8 11V8a4 4 0 018 0v3" />
+        </svg>
+        Pago seguro procesado por Mercado Pago
+      </p>
     </div>
   </aside>
 
@@ -266,23 +315,43 @@
   </div>
 
   <!-- Modal de pago con tarjeta (Card Payment Brick de Mercado Pago) -->
-  <div id="card-payment-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-6">
-    <div class="surface rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto relative">
-      <div class="px-6 py-4 border-b border-brand-border dark:border-gray-700 flex items-center gap-2.5">
-        <span class="w-8 h-8 rounded-lg bg-brand-primary/15 dark:bg-brand-accent/15 flex items-center justify-center flex-shrink-0">
+  <div id="card-payment-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 py-6">
+    <div class="surface rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-gray-700 flex items-center gap-3">
+        <span class="w-9 h-9 rounded-lg bg-brand-primary/15 dark:bg-brand-accent/15 flex items-center justify-center flex-shrink-0">
           <svg class="w-4 h-4 text-brand-primary-dark dark:text-brand-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <rect x="2" y="5" width="20" height="14" rx="2" />
             <path stroke-linecap="round" d="M2 10h20" />
           </svg>
         </span>
-        <h3 class="font-bold text-lg flex-1">Pagar con tarjeta</h3>
-        <button id="card-payment-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+        <div class="flex-1 min-w-0 leading-tight">
+          <h3 class="font-bold text-lg">Pagar con tarjeta</h3>
+          <p class="text-xs text-gray-500 dark:text-gray-400">Crédito o débito</p>
+        </div>
+        <button id="card-payment-close" class="p-1.5 -mr-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700 transition-colors" aria-label="Cerrar">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+        </button>
       </div>
 
-      <div class="px-6 py-4">
+      <div class="thin-scroll flex-1 overflow-y-auto px-6 py-5">
+        <div class="flex items-baseline justify-between rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-brand-border dark:border-gray-700 px-4 py-3 mb-5">
+          <span class="text-sm text-gray-500 dark:text-gray-400">Total a pagar</span>
+          <span id="card-payment-amount" class="font-extrabold text-xl text-brand-primary-dark dark:text-brand-accent"></span>
+        </div>
+
         <p id="card-payment-error" class="hidden text-red-500 text-sm mb-3"></p>
         <p id="card-payment-result" class="hidden text-sm mb-3"></p>
         <div id="cardPaymentBrick_container"></div>
+
+        <p class="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-4">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="11" width="14" height="9" rx="2" />
+            <path stroke-linecap="round" d="M8 11V8a4 4 0 018 0v3" />
+          </svg>
+          Tus datos viajan cifrados. El pago lo procesa Mercado Pago.
+        </p>
       </div>
     </div>
   </div>
