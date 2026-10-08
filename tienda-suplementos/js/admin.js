@@ -14,6 +14,7 @@ import {
   deleteCategory,
   subscribeToOrders,
   updateOrderStatus,
+  createLocalSale,
   subscribeToShippingSettings,
   saveShippingSettings,
   loginWithEmail,
@@ -538,7 +539,7 @@ function renderTable() {
         ${isOffer ? `<span class="text-xs text-gray-400 line-through ml-1">${formatPrice(product.listPrice)}</span>` : ''}
       </td>
       <td data-label="Stock" class="block md:table-cell py-1 md:py-2 px-0 md:px-3">
-        <span class="${stockBadge.className}">${stockBadge.label}</span>
+        <button type="button" data-edit-stock="${product.id}" class="${stockBadge.className} cursor-pointer hover:ring-2 hover:ring-brand-primary/40" title="Clic para cambiar el stock">${stockBadge.label}</button>
       </td>
       <td class="block md:table-cell py-1 md:py-2 px-0 md:px-3 text-left md:text-right whitespace-nowrap mt-2 md:mt-0">
         <button
@@ -1033,6 +1034,9 @@ function orderShippingSummary(order) {
     const addr = order.shipping.address;
     const zone = order.shipping.zone ? ` (${order.shipping.zone})` : '';
     return addr ? `Envío${zone} — ${addr.address}, ${addr.city} (CP ${addr.zip})` : 'Envío a domicilio';
+  }
+  if (order.source === 'local') {
+    return `Venta en el local${order.paymentMethod ? ` — ${order.paymentMethod}` : ''}`;
   }
   return 'Retiro en el local';
 }
@@ -1556,12 +1560,331 @@ function renderTopProducts(productTotals) {
 }
 
 // ---------------------------------------------------------------------------
+// Venta en el local: el dueño carga lo que vendió en el mostrador para que
+// el stock y las estadísticas no dependan solo de las ventas web.
+// ---------------------------------------------------------------------------
+
+const saleModal = document.getElementById('sale-modal');
+const saleForm = document.getElementById('sale-form');
+const saleSearch = document.getElementById('sale-search');
+const saleProducts = document.getElementById('sale-products');
+const saleItems = document.getElementById('sale-items');
+const saleTotal = document.getElementById('sale-total');
+const saleCustomer = document.getElementById('sale-customer');
+const salePayment = document.getElementById('sale-payment');
+const saleError = document.getElementById('sale-error');
+const saleSubmit = document.getElementById('sale-submit');
+
+let saleLines = []; // [{ id, qty }] — nombre, precio y stock se leen del producto al momento
+
+function productSalePrice(product) {
+  return Number(hasValidOffer(product) ? product.offerPrice : product.listPrice) || 0;
+}
+
+/** Líneas de la venta con los datos actuales de cada producto (descarta los que ya no existen). */
+function getSaleDetail() {
+  return saleLines
+    .map((line) => {
+      const product = currentProducts.find((p) => p.id === line.id);
+      return product ? { product, qty: line.qty, price: productSalePrice(product) } : null;
+    })
+    .filter(Boolean);
+}
+
+function renderSaleProducts() {
+  const term = saleSearch.value.trim().toLowerCase();
+  const matches = currentProducts
+    .filter((p) => !term || p.name?.toLowerCase().includes(term) || p.brand?.toLowerCase().includes(term))
+    .slice(0, 30);
+
+  if (matches.length === 0) {
+    saleProducts.innerHTML = '<p class="text-gray-400 text-xs py-2">No hay productos con ese nombre.</p>';
+    return;
+  }
+
+  saleProducts.innerHTML = matches
+    .map((product) => {
+      const stock = Number(product.stock ?? 0);
+      return `
+      <button type="button" data-sale-add="${product.id}" ${stock <= 0 ? 'disabled' : ''}
+        class="flex items-center justify-between gap-3 text-left py-2 px-2 rounded border-b last:border-b-0 border-brand-border dark:border-slate-800
+               hover:bg-gray-50 dark:hover:bg-slate-800/40 disabled:opacity-40 disabled:cursor-not-allowed">
+        <span class="min-w-0">
+          <span class="block font-medium truncate">${escapeHtml(product.name)}</span>
+          <span class="block text-xs text-gray-400">${formatPrice(productSalePrice(product))} · ${stock <= 0 ? 'sin stock' : `stock ${stock}`}</span>
+        </span>
+        <span class="text-brand-primary-dark dark:text-brand-accent font-bold text-lg leading-none flex-shrink-0">+</span>
+      </button>`;
+    })
+    .join('');
+}
+
+function renderSaleItems() {
+  const detail = getSaleDetail();
+
+  saleItems.innerHTML =
+    detail.length === 0
+      ? '<p class="text-gray-400 text-xs py-2">Elegí productos de la lista para sumarlos a la venta.</p>'
+      : detail
+          .map(
+            ({ product, qty, price }) => `
+      <div class="flex items-center justify-between gap-2">
+        <span class="min-w-0 flex-1">
+          <span class="block truncate">${escapeHtml(product.name)}</span>
+          <span class="block text-xs text-gray-400">${formatPrice(price * qty)}</span>
+        </span>
+        <span class="flex items-center gap-1 flex-shrink-0">
+          <button type="button" data-sale-qty="${product.id}" data-delta="-1" class="w-7 h-7 rounded border border-brand-border dark:border-slate-700 font-bold" aria-label="Quitar una unidad">−</button>
+          <span class="w-7 text-center font-semibold">${qty}</span>
+          <button type="button" data-sale-qty="${product.id}" data-delta="1" class="w-7 h-7 rounded border border-brand-border dark:border-slate-700 font-bold" aria-label="Sumar una unidad">+</button>
+        </span>
+      </div>`
+          )
+          .join('');
+
+  saleTotal.textContent = formatPrice(detail.reduce((sum, line) => sum + line.price * line.qty, 0));
+}
+
+/** Suma o resta unidades de un producto en la venta, sin pasar el stock disponible. */
+function changeSaleQty(productId, delta) {
+  const product = currentProducts.find((p) => p.id === productId);
+  if (!product) return;
+  const stock = Number(product.stock ?? 0);
+  const line = saleLines.find((l) => l.id === productId);
+  const nextQty = (line?.qty ?? 0) + delta;
+
+  if (nextQty > stock) {
+    showToast(`Solo hay ${stock} en stock de "${product.name}".`, 'error');
+    return;
+  }
+  if (nextQty <= 0) {
+    saleLines = saleLines.filter((l) => l.id !== productId);
+  } else if (line) {
+    line.qty = nextQty;
+  } else {
+    saleLines.push({ id: productId, qty: nextQty });
+  }
+  saleError.classList.add('hidden');
+  renderSaleItems();
+}
+
+function openSaleModal() {
+  saleLines = [];
+  saleForm.reset();
+  saleError.classList.add('hidden');
+  renderSaleProducts();
+  renderSaleItems();
+  saleModal.classList.remove('hidden');
+  saleSearch.focus();
+}
+
+function closeSaleModal() {
+  saleModal.classList.add('hidden');
+}
+
+document.getElementById('btn-new-sale')?.addEventListener('click', openSaleModal);
+document.getElementById('sale-close')?.addEventListener('click', closeSaleModal);
+document.getElementById('sale-cancel')?.addEventListener('click', closeSaleModal);
+saleSearch?.addEventListener('input', renderSaleProducts);
+
+saleProducts?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-sale-add]');
+  if (btn) changeSaleQty(btn.dataset.saleAdd, 1);
+});
+
+saleItems?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-sale-qty]');
+  if (btn) changeSaleQty(btn.dataset.saleQty, Number(btn.dataset.delta));
+});
+
+saleForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const detail = getSaleDetail();
+
+  let error = '';
+  if (detail.length === 0) error = 'Agregá al menos un producto.';
+  const short = detail.find(({ product, qty }) => qty > Number(product.stock ?? 0));
+  if (short) error = `No alcanza el stock de "${short.product.name}".`;
+
+  saleError.textContent = error;
+  saleError.classList.toggle('hidden', !error);
+  if (error) return;
+
+  const total = detail.reduce((sum, line) => sum + line.price * line.qty, 0);
+
+  saleSubmit.disabled = true;
+  try {
+    await createLocalSale({
+      customerName: saleCustomer.value.trim() || 'Venta en el local',
+      paymentMethod: salePayment.value,
+      items: detail.map(({ product, qty, price }) => ({ id: product.id, name: product.name, price, qty })),
+      total,
+    });
+    showToast(`Venta registrada — ${formatPrice(total)}`);
+    closeSaleModal();
+  } catch (err) {
+    console.error(err);
+    saleError.textContent = 'No se pudo registrar la venta. Revisá la conexión y probá de nuevo.';
+    saleError.classList.remove('hidden');
+  } finally {
+    saleSubmit.disabled = false;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Comprobante imprimible de un pedido (para armar el paquete o entregar)
+// ---------------------------------------------------------------------------
+
+function printOrder(order) {
+  const rows = (order.items || [])
+    .map(
+      (item) => `
+      <tr>
+        <td>${escapeHtml(item.qty)}</td>
+        <td>${escapeHtml(item.name)}</td>
+        <td class="num">${formatPrice(item.price)}</td>
+        <td class="num">${formatPrice(item.price * item.qty)}</td>
+      </tr>`
+    )
+    .join('');
+
+  const shippingCost = Number(order.shipping?.cost) || 0;
+  const contact = [order.customerPhone, order.customerEmail].filter(Boolean).map(escapeHtml).join(' · ');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pedido ${escapeHtml(order.id.slice(0, 8).toUpperCase())}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 32px; font-size: 14px; }
+    h1 { font-size: 22px; margin: 0; }
+    .muted { color: #666; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
+    .block { margin-bottom: 16px; }
+    .label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; text-transform: uppercase; color: #666; border-bottom: 1px solid #999; padding: 6px 4px; }
+    td { padding: 6px 4px; border-bottom: 1px solid #ddd; vertical-align: top; }
+    .num { text-align: right; white-space: nowrap; }
+    .total td { border-bottom: 0; font-weight: 700; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>${escapeHtml(tienda.store.name)}</h1>
+      <div class="muted">Pedido ${escapeHtml(order.id.slice(0, 8).toUpperCase())}</div>
+    </div>
+    <div style="text-align: right">
+      <div>${escapeHtml(formatOrderDate(order.createdAt))}</div>
+      <div class="muted">${escapeHtml(getOrderStatusLabel(order.status || 'pending', order.shipping?.method))}</div>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="label">Cliente</div>
+    <div>${escapeHtml(order.customerName || 'Sin nombre')}</div>
+    ${contact ? `<div class="muted">${contact}</div>` : ''}
+  </div>
+
+  <div class="block">
+    <div class="label">Entrega</div>
+    <div>${escapeHtml(orderShippingSummary(order))}</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Cant.</th><th>Producto</th><th class="num">Precio</th><th class="num">Subtotal</th></tr>
+    </thead>
+    <tbody>
+      ${rows}
+      ${shippingCost > 0 ? `<tr><td></td><td>Envío</td><td></td><td class="num">${formatPrice(shippingCost)}</td></tr>` : ''}
+      <tr class="total"><td></td><td>Total</td><td></td><td class="num">${formatPrice(order.total)}</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+  const printWindow = window.open('', '_blank', 'width=720,height=900');
+  if (!printWindow) {
+    showToast('El navegador bloqueó la ventana de impresión. Permití las ventanas emergentes.', 'error');
+    return;
+  }
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+document.getElementById('order-detail-print')?.addEventListener('click', () => {
+  if (orderBeingViewed) printOrder(orderBeingViewed);
+});
+
+// ---------------------------------------------------------------------------
+// Stock editable desde la tabla: clic en la cantidad, escribir y Enter
+// ---------------------------------------------------------------------------
+
+productsTableBody?.addEventListener('click', (e) => {
+  const badge = e.target.closest('[data-edit-stock]');
+  if (!badge) return;
+
+  const product = currentProducts.find((p) => p.id === badge.dataset.editStock);
+  if (!product) return;
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.step = '1';
+  input.value = Number(product.stock ?? 0);
+  input.className = 'input-field text-sm w-20 py-1';
+  input.setAttribute('aria-label', `Stock de ${product.name}`);
+  badge.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let finished = false;
+  const finish = async (save) => {
+    if (finished) return;
+    finished = true;
+    const value = parseInt(input.value, 10);
+    const changed = save && Number.isInteger(value) && value >= 0 && value !== Number(product.stock ?? 0);
+
+    if (save && (!Number.isInteger(value) || value < 0)) {
+      showToast('El stock tiene que ser un número de 0 para arriba.', 'error');
+    }
+    if (changed) {
+      try {
+        await updateProduct(product.id, { stock: value });
+        showToast(`Stock de "${product.name}" actualizado a ${value}.`);
+        return; // la tabla se vuelve a dibujar sola cuando Firestore avisa del cambio
+      } catch (err) {
+        console.error(err);
+        showToast('No se pudo actualizar el stock.', 'error');
+      }
+    }
+    renderTable();
+  };
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') finish(true);
+    if (event.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+});
+
+// ---------------------------------------------------------------------------
 // Suscripción en tiempo real a Firestore
 // ---------------------------------------------------------------------------
 
 subscribeToProducts((products) => {
   currentProducts = products;
   renderAll();
+  if (!saleModal.classList.contains('hidden')) {
+    renderSaleProducts();
+    renderSaleItems();
+  }
 });
 
 subscribeToCategories((categories) => {

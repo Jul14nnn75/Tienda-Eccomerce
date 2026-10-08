@@ -17,6 +17,8 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  writeBatch,
+  increment,
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -193,6 +195,42 @@ export function subscribeToOrders(callback) {
       callback([]);
     }
   );
+}
+
+/**
+ * Registra una venta hecha en el local desde el panel: crea el pedido ya
+ * completado y descuenta el stock de cada producto, todo junto (si algo
+ * falla, no se guarda nada). Solo admin (ver firestore.rules).
+ * @param {{customerName:string, paymentMethod:string, items:Array<{id,name,price,qty}>, total:number}} sale
+ */
+export async function createLocalSale(sale) {
+  const batch = writeBatch(db);
+  const orderRef = doc(collection(db, ORDERS_COLLECTION));
+
+  batch.set(orderRef, {
+    userId: auth.currentUser.uid,
+    source: 'local',
+    customerName: sale.customerName,
+    customerPhone: '',
+    customerEmail: '',
+    paymentMethod: sale.paymentMethod,
+    items: sale.items,
+    total: sale.total,
+    shipping: { method: 'pickup', cost: 0, zone: null, address: null },
+    status: 'completed',
+    createdAt: serverTimestamp(),
+    paidAt: serverTimestamp(),
+  });
+
+  sale.items.forEach((item) => {
+    batch.update(doc(db, PRODUCTS_COLLECTION, item.id), {
+      stock: increment(-item.qty),
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  await batch.commit();
+  return orderRef;
 }
 
 /** Marca un pedido como pagado a mano (ej: pago en efectivo al retirar). */

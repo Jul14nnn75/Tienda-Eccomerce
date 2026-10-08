@@ -331,6 +331,9 @@
           >
             Exportar CSV
           </button>
+          <button id="btn-new-sale" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap">
+            + Nueva venta
+          </button>
         </div>
 
         <div class="surface border dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
@@ -605,8 +608,73 @@
         <button type="button" id="order-detail-save-status" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
           Guardar
         </button>
+        <button
+          type="button"
+          id="order-detail-print"
+          class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
+                 hover:border-brand-primary hover:text-brand-primary dark:hover:border-brand-accent dark:hover:text-brand-accent
+                 text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap transition-colors"
+        >
+          Imprimir
+        </button>
       </div>
     </div>
+  </div>
+
+  <!-- Modal de venta en el local -->
+  <div id="sale-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+    <form id="sale-form" class="surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-lg">Nueva venta en el local</h3>
+          <p class="text-xs text-gray-500 dark:text-gray-400">Descuenta el stock y suma a las ventas del día.</p>
+        </div>
+        <button type="button" id="sale-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4 flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Productos</h4>
+          <input id="sale-search" type="text" placeholder="Buscar por nombre o marca..." class="input-field text-sm mb-2" autocomplete="off" />
+          <div id="sale-products" class="flex flex-col max-h-64 overflow-y-auto text-sm"></div>
+        </div>
+
+        <div class="flex flex-col">
+          <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Esta venta</h4>
+          <div id="sale-items" class="flex flex-col gap-2 text-sm flex-1"></div>
+
+          <div class="flex justify-between border-t border-brand-border dark:border-slate-800 pt-3 mt-3">
+            <span class="font-semibold">Total</span>
+            <span id="sale-total" class="font-extrabold text-brand-primary-dark dark:text-brand-accent">$0</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <div>
+              <label for="sale-customer" class="text-xs font-medium block mb-1">Cliente (opcional)</label>
+              <input id="sale-customer" type="text" maxlength="60" class="input-field text-sm" />
+            </div>
+            <div>
+              <label for="sale-payment" class="text-xs font-medium block mb-1">Forma de pago</label>
+              <select id="sale-payment" class="input-field text-sm">
+                <option>Efectivo</option>
+                <option>Transferencia</option>
+                <option>Tarjeta de débito</option>
+                <option>Tarjeta de crédito</option>
+                <option>Otro</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border dark:border-slate-800 flex items-center justify-end gap-3">
+        <p id="sale-error" class="hidden text-red-500 text-sm mr-auto"></p>
+        <button type="button" id="sale-cancel" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white px-3 py-2">Cancelar</button>
+        <button type="submit" id="sale-submit" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
+          Registrar venta
+        </button>
+      </div>
+    </form>
   </div>
 
   <!-- Contenedor de toasts -->

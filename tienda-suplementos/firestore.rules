@@ -44,7 +44,10 @@ service cloud.firestore {
     match /pedidos/{pedidoId} {
       // El pedido nace siempre "pending": marcarlo pagado y guardar el total
       // verificado es tarea exclusiva del Worker de pagos (cuenta de servicio).
-      allow create: if isSignedIn()
+      // El admin, además, puede cargar ventas hechas en el local, que nacen
+      // ya completadas (botón "Nueva venta" del panel).
+      allow create: if isAdmin() || (
+                       isSignedIn()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.status == 'pending'
                     && request.resource.data.total is number
@@ -52,7 +55,8 @@ service cloud.firestore {
                     && request.resource.data.items is list
                     && request.resource.data.items.size() > 0
                     && request.resource.data.items.size() <= 50
-                    && !request.resource.data.keys().hasAny(['paidAt', 'verifiedTotal']);
+                    && !request.resource.data.keys().hasAny(['paidAt', 'verifiedTotal'])
+                    );
       allow read: if isOwner(resource.data.userId) || isAdmin();
       allow update, delete: if isAdmin();
     }
