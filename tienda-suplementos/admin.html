@@ -159,6 +159,61 @@
             <div id="summary-low-stock" class="flex flex-col text-sm"></div>
           </div>
         </div>
+
+        <div class="surface border dark:border-slate-800 rounded-lg p-4 shadow-sm mt-4">
+          <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-sm font-bold">Reporte por fechas y cierre de caja</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Ventas cobradas en el período, separadas por canal y forma de pago.</p>
+            </div>
+            <div class="flex flex-wrap items-end gap-2">
+              <div class="flex gap-1" id="report-presets">
+                <button type="button" data-report-preset="today" class="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-brand-border dark:border-slate-700 hover:border-brand-primary dark:hover:border-brand-accent transition-colors">Hoy</button>
+                <button type="button" data-report-preset="yesterday" class="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-brand-border dark:border-slate-700 hover:border-brand-primary dark:hover:border-brand-accent transition-colors">Ayer</button>
+                <button type="button" data-report-preset="week" class="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-brand-border dark:border-slate-700 hover:border-brand-primary dark:hover:border-brand-accent transition-colors">7 días</button>
+                <button type="button" data-report-preset="month" class="text-xs font-semibold px-2.5 py-1.5 rounded-md border border-brand-border dark:border-slate-700 hover:border-brand-primary dark:hover:border-brand-accent transition-colors">Este mes</button>
+              </div>
+              <div>
+                <label for="report-from" class="text-xs font-medium block mb-1">Desde</label>
+                <input id="report-from" type="date" class="input-field text-sm py-1.5" />
+              </div>
+              <div>
+                <label for="report-to" class="text-xs font-medium block mb-1">Hasta</label>
+                <input id="report-to" type="date" class="input-field text-sm py-1.5" />
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <span class="metric-card-label block">Total cobrado</span>
+              <span id="report-total" class="metric-card-value">$0</span>
+            </div>
+            <div>
+              <span class="metric-card-label block">Ventas</span>
+              <span id="report-count" class="metric-card-value">0</span>
+            </div>
+            <div>
+              <span class="metric-card-label block">Ticket promedio</span>
+              <span id="report-avg" class="metric-card-value">$0</span>
+            </div>
+            <div>
+              <span class="metric-card-label block">Cancelados</span>
+              <span id="report-cancelled" class="metric-card-value">0</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+            <div>
+              <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Por canal</h4>
+              <div id="report-by-channel" class="flex flex-col gap-1.5"></div>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Por forma de pago</h4>
+              <div id="report-by-payment" class="flex flex-col gap-1.5"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ============================= PRODUCTOS ============================= -->
@@ -209,7 +264,15 @@
 
       <div class="flex items-center justify-between gap-3 mb-4">
         <h2 class="font-bold text-lg">Productos</h2>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <button
+            id="btn-bulk-prices"
+            class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
+                   hover:border-brand-primary hover:text-brand-primary dark:hover:border-brand-accent dark:hover:text-brand-accent
+                   text-sm font-semibold px-4 py-2 rounded-md whitespace-nowrap transition-colors"
+          >
+            Actualizar precios
+          </button>
           <button
             id="btn-manage-categories"
             class="border border-brand-border dark:border-slate-800 text-gray-600 dark:text-slate-300
@@ -321,6 +384,7 @@
             <option value="preparing">Preparando</option>
             <option value="ready">Listos / enviados</option>
             <option value="completed">Completados</option>
+            <option value="cancelled">Cancelados</option>
             <option value="abandoned">Abandonados (sin pagar)</option>
           </select>
           <button
@@ -604,6 +668,7 @@
           <option value="preparing">Preparando</option>
           <option value="ready">Listo / enviado</option>
           <option value="completed">Completado</option>
+          <option value="cancelled">Cancelado (devuelve el stock)</option>
         </select>
         <button type="button" id="order-detail-save-status" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
           Guardar
@@ -672,6 +737,57 @@
         <button type="button" id="sale-cancel" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white px-3 py-2">Cancelar</button>
         <button type="submit" id="sale-submit" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
           Registrar venta
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal de actualización masiva de precios -->
+  <div id="bulk-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+    <form id="bulk-form" class="surface rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div class="px-6 py-4 border-b border-brand-border dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-lg">Actualizar precios</h3>
+        <button type="button" id="bulk-close" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="px-6 py-4 flex flex-col gap-4">
+        <div>
+          <label for="bulk-category" class="text-sm font-medium block mb-1">Productos</label>
+          <select id="bulk-category" class="input-field"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="bulk-percent" class="text-sm font-medium block mb-1">Porcentaje</label>
+            <input id="bulk-percent" type="number" step="0.1" placeholder="Ej: 8" class="input-field" required />
+            <p class="text-xs text-gray-400 mt-1">Negativo para bajar (ej: -5).</p>
+          </div>
+          <div>
+            <label for="bulk-rounding" class="text-sm font-medium block mb-1">Redondear a</label>
+            <select id="bulk-rounding" class="input-field">
+              <option value="1">Sin redondeo ($1)</option>
+              <option value="10">$10</option>
+              <option value="100" selected>$100</option>
+              <option value="500">$500</option>
+              <option value="1000">$1.000</option>
+            </select>
+          </div>
+        </div>
+        <label class="flex items-start gap-2 text-sm cursor-pointer">
+          <input id="bulk-offers" type="checkbox" class="mt-0.5" checked />
+          <span>Actualizar también los precios de oferta</span>
+        </label>
+
+        <div class="rounded-md bg-gray-50 dark:bg-slate-900/50 border border-brand-border dark:border-slate-800 p-3 text-sm">
+          <p id="bulk-summary" class="font-medium"></p>
+          <div id="bulk-preview" class="flex flex-col gap-1 mt-2 text-xs text-gray-500 dark:text-gray-400"></div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border dark:border-slate-800 flex items-center justify-end gap-3">
+        <p id="bulk-error" class="hidden text-red-500 text-sm mr-auto"></p>
+        <button type="button" id="bulk-cancel" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white px-3 py-2">Cancelar</button>
+        <button type="submit" id="bulk-submit" class="bg-brand-primary hover:bg-brand-primary-dark text-white text-sm font-semibold px-5 py-2 rounded-md whitespace-nowrap">
+          Aplicar
         </button>
       </div>
     </form>

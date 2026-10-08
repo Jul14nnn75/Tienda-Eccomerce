@@ -13,8 +13,10 @@ import {
   createCategory,
   deleteCategory,
   subscribeToOrders,
-  updateOrderStatus,
+  changeOrderStatus,
+  bulkUpdateProducts,
   createLocalSale,
+  isOrderStockDiscounted,
   subscribeToShippingSettings,
   saveShippingSettings,
   loginWithEmail,
@@ -1004,6 +1006,7 @@ function getOrderStatusLabel(status, shippingMethod) {
     preparing: 'Preparando',
     ready: isPickup ? 'Listo para retirar' : 'Enviado',
     completed: isPickup ? 'Retirado' : 'Entregado',
+    cancelled: 'Cancelado',
   };
   return labels[status] || labels.pending;
 }
@@ -1020,6 +1023,7 @@ function getOrderStatusBadgeClass(status) {
     preparing: 'stock-badge-progress',
     ready: 'stock-badge-ok',
     completed: 'stock-badge-done',
+    cancelled: 'stock-badge-out',
   };
   return classes[status] || classes.pending;
 }
@@ -1250,6 +1254,11 @@ orderDetailModal?.addEventListener('click', (e) => {
   if (e.target === orderDetailModal) closeOrderDetailModal();
 });
 
+/** Productos que siguen existiendo: solo a esos se les puede devolver o descontar stock. */
+function existingProductIds() {
+  return new Set(currentProducts.map((p) => p.id));
+}
+
 /** Abre el detalle del pedido de la fila clickeada (tabla de pedidos y resumen). */
 function handleOrderRowClick(e) {
   const advanceBtn = e.target.closest('[data-advance-order]');
@@ -1267,7 +1276,9 @@ function handleOrderRowClick(e) {
 async function advanceOrder(button) {
   button.disabled = true;
   try {
-    await updateOrderStatus(button.dataset.advanceOrder, button.dataset.nextStatus);
+    const order = currentOrders.find((o) => o.id === button.dataset.advanceOrder);
+    if (!order) return;
+    await changeOrderStatus(order, button.dataset.nextStatus, existingProductIds());
     showToast('Estado del pedido actualizado.');
   } catch (err) {
     console.error(err);
@@ -1283,9 +1294,18 @@ orderDetailSaveStatus?.addEventListener('click', async () => {
   if (!orderBeingViewed) return;
   const newStatus = orderDetailStatusSelect.value;
 
+  if (newStatus === 'cancelled' && orderBeingViewed.status !== 'cancelled') {
+    const returnsStock = isOrderStockDiscounted(orderBeingViewed);
+    const confirmed = window.confirm(
+      `¿Cancelar este pedido?${returnsStock ? ' Se devuelve el stock de sus productos y deja de contar como venta.' : ''}` +
+        (orderBeingViewed.source === 'local' ? '' : ' La devolución del dinero se hace aparte, desde Mercado Pago.')
+    );
+    if (!confirmed) return;
+  }
+
   orderDetailSaveStatus.disabled = true;
   try {
-    await updateOrderStatus(orderBeingViewed.id, newStatus);
+    await changeOrderStatus(orderBeingViewed, newStatus, existingProductIds());
     showToast('Estado del pedido actualizado.');
     closeOrderDetailModal();
   } catch (err) {
@@ -1349,7 +1369,7 @@ btnExportOrders?.addEventListener('click', exportOrdersToCsv);
 
 /** Cuenta como venta cualquier pedido que ya no esté esperando el pago. */
 function isRevenueOrder(order) {
-  return (order.status || 'pending') !== 'pending';
+  return !['pending', 'cancelled'].includes(order.status || 'pending');
 }
 
 /** Clave de día en hora LOCAL (toISOString usa UTC y corre las ventas de la noche al día siguiente). */
@@ -1875,6 +1895,232 @@ productsTableBody?.addEventListener('click', (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// Actualización masiva de precios (ej: "subir 8% toda la categoría Proteínas")
+// ---------------------------------------------------------------------------
+
+const bulkModal = document.getElementById('bulk-modal');
+const bulkForm = document.getElementById('bulk-form');
+const bulkCategory = document.getElementById('bulk-category');
+const bulkPercent = document.getElementById('bulk-percent');
+const bulkRounding = document.getElementById('bulk-rounding');
+const bulkOffers = document.getElementById('bulk-offers');
+const bulkSummary = document.getElementById('bulk-summary');
+const bulkPreview = document.getElementById('bulk-preview');
+const bulkError = document.getElementById('bulk-error');
+const bulkSubmit = document.getElementById('bulk-submit');
+
+/** Precio nuevo: aplica el porcentaje y redondea al múltiplo elegido (nunca menos que ese múltiplo). */
+function applyPriceChange(price, percent, rounding) {
+  const raw = Number(price) * (1 + percent / 100);
+  return Math.max(Math.round(raw / rounding) * rounding, rounding);
+}
+
+/**
+ * Cambios que se aplicarían con lo que está cargado en el formulario.
+ * @returns {Array<{product:object, data:{listPrice:number, offerPrice:number|null}}>}
+ */
+function getBulkPriceChanges() {
+  const percent = Number(bulkPercent.value);
+  const rounding = Number(bulkRounding.value);
+  if (bulkPercent.value === '' || !Number.isFinite(percent) || percent === 0 || percent <= -100) return [];
+
+  return currentProducts
+    .filter((product) => bulkCategory.value === 'Todas' || product.category === bulkCategory.value)
+    .filter((product) => Number(product.listPrice) > 0)
+    .map((product) => {
+      const listPrice = applyPriceChange(product.listPrice, percent, rounding);
+      // La oferta se mueve con el mismo porcentaje; si no se actualiza o deja
+      // de ser menor al precio de lista, se conserva tal cual o se quita.
+      let offerPrice = product.offerPrice ?? null;
+      if (hasValidOffer(product) && bulkOffers.checked) {
+        offerPrice = applyPriceChange(product.offerPrice, percent, rounding);
+      }
+      if (offerPrice != null && Number(offerPrice) >= listPrice) offerPrice = null;
+      return { product, data: { listPrice, offerPrice } };
+    });
+}
+
+function renderBulkPreview() {
+  const changes = getBulkPriceChanges();
+  bulkError.classList.add('hidden');
+
+  if (changes.length === 0) {
+    bulkSummary.textContent = 'Cargá un porcentaje para ver cómo quedan los precios.';
+    bulkPreview.innerHTML = '';
+    return;
+  }
+
+  bulkSummary.textContent = `Se van a actualizar ${changes.length} producto${changes.length === 1 ? '' : 's'}.`;
+  bulkPreview.innerHTML =
+    changes
+      .slice(0, 4)
+      .map(
+        ({ product, data }) => `
+      <div class="flex justify-between gap-3">
+        <span class="truncate">${escapeHtml(product.name)}</span>
+        <span class="flex-shrink-0">${formatPrice(product.listPrice)} → <strong>${formatPrice(data.listPrice)}</strong></span>
+      </div>`
+      )
+      .join('') + (changes.length > 4 ? `<span>y ${changes.length - 4} más</span>` : '');
+}
+
+function openBulkModal() {
+  bulkForm.reset();
+  bulkCategory.innerHTML =
+    '<option value="Todas">Todos los productos</option>' +
+    allCategories
+      .map((cat) => `<option value="${escapeHtml(cat.name)}">Categoría: ${escapeHtml(cat.name)}</option>`)
+      .join('');
+  renderBulkPreview();
+  bulkModal.classList.remove('hidden');
+  bulkPercent.focus();
+}
+
+function closeBulkModal() {
+  bulkModal.classList.add('hidden');
+}
+
+document.getElementById('btn-bulk-prices')?.addEventListener('click', openBulkModal);
+document.getElementById('bulk-close')?.addEventListener('click', closeBulkModal);
+document.getElementById('bulk-cancel')?.addEventListener('click', closeBulkModal);
+bulkForm?.addEventListener('input', renderBulkPreview);
+
+bulkForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const changes = getBulkPriceChanges();
+  if (changes.length === 0) {
+    bulkError.textContent = 'Cargá un porcentaje distinto de 0.';
+    bulkError.classList.remove('hidden');
+    return;
+  }
+
+  const percent = Number(bulkPercent.value);
+  const confirmed = window.confirm(
+    `Vas a ${percent > 0 ? 'subir' : 'bajar'} ${Math.abs(percent)}% el precio de ${changes.length} producto${
+      changes.length === 1 ? '' : 's'
+    }. Los precios cambian en la tienda al instante. ¿Seguimos?`
+  );
+  if (!confirmed) return;
+
+  bulkSubmit.disabled = true;
+  try {
+    await bulkUpdateProducts(changes.map(({ product, data }) => ({ id: product.id, data })));
+    showToast(`Precios actualizados en ${changes.length} producto${changes.length === 1 ? '' : 's'}.`);
+    closeBulkModal();
+  } catch (err) {
+    console.error(err);
+    bulkError.textContent = 'No se pudieron actualizar los precios.';
+    bulkError.classList.remove('hidden');
+  } finally {
+    bulkSubmit.disabled = false;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Reporte por fechas / cierre de caja (pestaña Resumen)
+// ---------------------------------------------------------------------------
+
+const reportFrom = document.getElementById('report-from');
+const reportTo = document.getElementById('report-to');
+const reportTotal = document.getElementById('report-total');
+const reportCount = document.getElementById('report-count');
+const reportAvg = document.getElementById('report-avg');
+const reportCancelled = document.getElementById('report-cancelled');
+const reportByChannel = document.getElementById('report-by-channel');
+const reportByPayment = document.getElementById('report-by-payment');
+
+/** Fecha local en formato de <input type="date"> (AAAA-MM-DD). */
+function toDateInputValue(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function setReportPreset(preset) {
+  const today = new Date();
+  let from = new Date(today);
+  let to = new Date(today);
+  if (preset === 'yesterday') {
+    from.setDate(today.getDate() - 1);
+    to = new Date(from);
+  } else if (preset === 'week') {
+    from.setDate(today.getDate() - 6);
+  } else if (preset === 'month') {
+    from = new Date(today.getFullYear(), today.getMonth(), 1);
+  }
+  reportFrom.value = toDateInputValue(from);
+  reportTo.value = toDateInputValue(to);
+  renderReport();
+}
+
+function renderReportBreakdown(container, groups) {
+  const entries = Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+  container.innerHTML =
+    entries.length === 0
+      ? '<p class="text-gray-400 text-xs">Sin ventas en el período.</p>'
+      : entries
+          .map(
+            ([label, data]) => `
+      <div class="flex items-center justify-between gap-3">
+        <span class="truncate">${escapeHtml(label)} <span class="text-xs text-gray-400">· ${data.count}</span></span>
+        <span class="font-semibold flex-shrink-0">${formatPrice(data.total)}</span>
+      </div>`
+          )
+          .join('');
+}
+
+function renderReport() {
+  if (!reportFrom.value || !reportTo.value) return;
+  // Las fechas del input son días locales: de 00:00 del "desde" a 23:59:59 del "hasta".
+  const [fromY, fromM, fromD] = reportFrom.value.split('-').map(Number);
+  const [toY, toM, toD] = reportTo.value.split('-').map(Number);
+  const start = new Date(fromY, fromM - 1, fromD);
+  const end = new Date(toY, toM - 1, toD + 1);
+
+  let total = 0;
+  let count = 0;
+  let cancelled = 0;
+  const byChannel = {};
+  const byPayment = {};
+  const add = (groups, label, amount) => {
+    if (!groups[label]) groups[label] = { total: 0, count: 0 };
+    groups[label].total += amount;
+    groups[label].count += 1;
+  };
+
+  currentOrders.forEach((order) => {
+    const date = order.createdAt?.toDate?.();
+    if (!date || date < start || date >= end) return;
+    if (order.status === 'cancelled') {
+      cancelled += 1;
+      return;
+    }
+    if (!isRevenueOrder(order)) return;
+
+    const amount = Number(order.total) || 0;
+    const isLocal = order.source === 'local';
+    total += amount;
+    count += 1;
+    add(byChannel, isLocal ? 'Local' : 'Tienda online', amount);
+    add(byPayment, isLocal ? order.paymentMethod || 'Sin especificar' : 'Mercado Pago (online)', amount);
+  });
+
+  reportTotal.textContent = formatPrice(total);
+  reportCount.textContent = count;
+  reportAvg.textContent = formatPrice(count > 0 ? Math.round(total / count) : 0);
+  reportCancelled.textContent = cancelled;
+  renderReportBreakdown(reportByChannel, byChannel);
+  renderReportBreakdown(reportByPayment, byPayment);
+}
+
+document.getElementById('report-presets')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-report-preset]');
+  if (btn) setReportPreset(btn.dataset.reportPreset);
+});
+reportFrom?.addEventListener('change', renderReport);
+reportTo?.addEventListener('change', renderReport);
+setReportPreset('today');
+
+// ---------------------------------------------------------------------------
 // Suscripción en tiempo real a Firestore
 // ---------------------------------------------------------------------------
 
@@ -1921,4 +2167,5 @@ subscribeToOrders((orders) => {
   renderOrdersMetrics();
   renderOrdersTable();
   renderSalesDashboard();
+  renderReport();
 });

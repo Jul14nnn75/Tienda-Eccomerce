@@ -667,7 +667,9 @@ async function handleWebhook(request, env) {
       return new Response('ok', { status: 200 });
     }
 
-    if (existingDoc.fields?.status?.stringValue === 'paid') {
+    // Solo se procesa un pedido que sigue pendiente: si ya está pagado, en
+    // preparación o cancelado desde el panel, el aviso no vuelve a descontar stock.
+    if (existingDoc.fields?.status?.stringValue !== 'pending') {
       return new Response('ok', { status: 200 });
     }
 

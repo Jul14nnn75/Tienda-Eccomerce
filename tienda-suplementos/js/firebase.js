@@ -233,9 +233,66 @@ export async function createLocalSale(sale) {
   return orderRef;
 }
 
-/** Marca un pedido como pagado a mano (ej: pago en efectivo al retirar). */
-export async function updateOrderStatus(id, status) {
-  await updateDoc(doc(db, ORDERS_COLLECTION, id), { status });
+/** Estados en los que el pedido NO tiene el stock descontado. */
+const STATUSES_WITHOUT_STOCK = ['pending', 'cancelled'];
+
+/**
+ * true si el stock de este pedido está descontado ahora mismo. Los pedidos
+ * viejos no tienen el campo stockDiscounted: se deduce de paidAt, que solo
+ * escriben el webhook de pagos y las ventas del local (los dos descuentan).
+ */
+export function isOrderStockDiscounted(order) {
+  return order.stockDiscounted ?? Boolean(order.paidAt);
+}
+
+/**
+ * Cambia el estado de un pedido desde el panel y mantiene el stock
+ * consistente, todo junto: al cancelar (o volver a "pendiente") devuelve las
+ * unidades; al marcarlo como pagado a mano las descuenta.
+ * @param {object} order — el pedido tal como está en Firestore (con id)
+ * @param {string} newStatus
+ * @param {Set<string>} existingProductIds — productos que siguen existiendo;
+ *   a los borrados no se les puede tocar el stock.
+ */
+export async function changeOrderStatus(order, newStatus, existingProductIds) {
+  const batch = writeBatch(db);
+  const discounted = isOrderStockDiscounted(order);
+  const shouldBeDiscounted = !STATUSES_WITHOUT_STOCK.includes(newStatus);
+
+  const orderUpdate = { status: newStatus };
+
+  if (discounted !== shouldBeDiscounted) {
+    const sign = shouldBeDiscounted ? -1 : 1;
+    (order.items || [])
+      .filter((item) => existingProductIds.has(item.id) && Number(item.qty) > 0)
+      .forEach((item) => {
+        batch.update(doc(db, PRODUCTS_COLLECTION, item.id), {
+          stock: increment(sign * Math.round(Number(item.qty))),
+          updatedAt: serverTimestamp(),
+        });
+      });
+    orderUpdate.stockDiscounted = shouldBeDiscounted;
+    if (shouldBeDiscounted && !order.paidAt) orderUpdate.paidAt = serverTimestamp();
+  }
+  if (newStatus === 'cancelled') orderUpdate.cancelledAt = serverTimestamp();
+
+  batch.update(doc(db, ORDERS_COLLECTION, order.id), orderUpdate);
+  await batch.commit();
+}
+
+/**
+ * Aplica cambios a muchos productos de una vez (ej: actualización masiva de
+ * precios). Firestore admite hasta 500 escrituras por lote, así que se parte.
+ * @param {Array<{id:string, data:object}>} updates
+ */
+export async function bulkUpdateProducts(updates) {
+  for (let i = 0; i < updates.length; i += 400) {
+    const batch = writeBatch(db);
+    updates.slice(i, i + 400).forEach(({ id, data }) => {
+      batch.update(doc(db, PRODUCTS_COLLECTION, id), { ...data, updatedAt: serverTimestamp() });
+    });
+    await batch.commit();
+  }
 }
 
 // ---------------------------------------------------------------------------
