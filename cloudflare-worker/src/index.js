@@ -539,11 +539,14 @@ async function markOrderPaidAndDecrementStock(env, accessToken, orderId, items) 
 /**
  * Valida la notificación con el esquema documentado por Mercado Pago
  * (HMAC-SHA256 sobre "id:<data.id lowercased>;request-id:<header>;ts:<header>;").
- * Confirmado con soporte técnico que los datos de entrada (request-id, ts,
- * data.id, secret) llegan correctos — el mismatch queda pendiente de
- * resolver con Mercado Pago. Hasta entonces handleWebhook solo lo registra,
- * salvo que REQUIRE_WEBHOOK_SIGNATURE esté en "true" (ver ahí por qué el
- * cobro igual queda protegido).
+ *
+ * Estado al 7/10/2026: con credenciales de PRUEBA y avisos de tipo "order"
+ * la firma no coincide, aunque la clave cargada es la del panel (pestaña
+ * "Modo de prueba") y este código valida bien una firma armada según la
+ * documentación. Se probaron además unas 130 variantes (clave, id, fecha y
+ * orden distintos) sin que coincida ninguna, así que no es un error de este
+ * lado. Falta comprobar si con credenciales de producción coincide: mirar
+ * los logs del primer pago real antes de activar REQUIRE_WEBHOOK_SIGNATURE.
  */
 async function verifyMpSignature(request, env, dataId) {
   const signatureHeader = request.headers.get('x-signature') || '';
@@ -576,6 +579,30 @@ async function verifyMpSignature(request, env, dataId) {
   return computedHex === v1;
 }
 
+/**
+ * Deja en el log (npx wrangler tail) los datos no secretos de un aviso cuya
+ * firma no coincidió, para poder ver si pasa solo en modo prueba
+ * (live_mode: false) o también con pagos reales.
+ */
+async function logSignatureMismatch(request, dataId) {
+  let body = null;
+  try {
+    body = await request.clone().json();
+  } catch {
+    // aviso sin cuerpo JSON
+  }
+  console.error(
+    'Firma de webhook no coincide ' +
+      JSON.stringify({
+        id: dataId,
+        accion: body?.action ?? null,
+        live_mode: body?.live_mode ?? null,
+        application_id: body?.application_id ?? null,
+        request_id: request.headers.get('x-request-id'),
+      })
+  );
+}
+
 async function handleWebhook(request, env) {
   const url = new URL(request.url);
   const dataId = url.searchParams.get('data.id') || url.searchParams.get('id');
@@ -603,7 +630,7 @@ async function handleWebhook(request, env) {
       console.error('Webhook rechazado: la firma no coincide.');
       return new Response('firma inválida', { status: 401 });
     }
-    console.error('Aviso: la firma del webhook no coincide; se verifica el pago contra Mercado Pago igual.');
+    await logSignatureMismatch(request, dataId);
   }
 
   try {
